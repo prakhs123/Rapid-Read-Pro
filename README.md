@@ -35,7 +35,7 @@ The application window will open. You can play/pause, resume, go back, or skip t
 ## Arguments:
 
 <path_to_file>: The path to the text file (EPUB or HTML) you want to convert to speech.  
---get-available-voices: Enter a locale in BCP-47 format (e.g. en-US) that you want to get the voices of, or enter empty to get voices in all locales.  
+--get-available-voices: Enter a locale in BCP-47 format (e.g. en-US) that you want to get the voices of.  
 --num-tokens: Number of tokens in one SSML string. Default is 1.  
 --item-page: Index of the page in the EPUB file to convert to speech. Default is 0.  
 --start-index: Index of SSML string to start speech. Default is 0.  
