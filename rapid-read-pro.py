@@ -78,7 +78,7 @@ def create_ssml_string(text, doc_tag, emphasis_level):
     return f"""
         <{doc_tag}>
             <mstts:express-as style="narration-professional">
-                <prosody rate="+0.00%">
+                <prosody rate="+40.00%">
                     <emphasis level="{emphasis_level}">
                         {text}
                     </emphasis>
@@ -204,6 +204,9 @@ def initial_setup():
         if args.epub_or_html_file.endswith('.epub'):
             book = epub.read_epub(args.epub_or_html_file)
             items = [item for item in book.get_items() if item.get_type() == 9]
+            for pg_no, item in enumerate(items):
+                print(pg_no, item.file_name)
+            item_page = int(input("Enter Item Page to read"))
             item = items[item_page]
             html = item.get_content()
         elif args.epub_or_html_file.startswith('http'):
@@ -255,28 +258,11 @@ def switch(word_length):
     }.get(word_length, 4)  # Fifth letter
 
 
-def display_word(word_duration_tuple_list, word_index, num_words):
-    if displaying.get() is True and word_index < num_words:
+def display_word(word_index, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list):
+    if displaying.get() is True and word_index < len(words_list):
+        word, word_time, left_words, right_words, previous_words, forward_words = \
+            words_list[word_index], words_time_list[word_index], left_words_list[word_index], right_words_list[word_index], previous_words_list[word_index], forward_words_list[word_index]
         show_word.delete("1.0", tk.END)
-        if word_index - 5 >= 0:
-            left_words = [wd[0] for wd in word_duration_tuple_list[word_index - 5:word_index]]
-            left_words = ' '.join(left_words)
-            previous_words = [wd[0] for wd in word_duration_tuple_list[:word_index - 5]]
-            previous_words = ' '.join(previous_words)
-        else:
-            left_words = [wd[0] for wd in word_duration_tuple_list[0:word_index]]
-            left_words = ' '.join(left_words)
-            previous_words = None
-        if word_index + 5 < len(word_duration_tuple_list):
-            right_words = [wd[0] for wd in word_duration_tuple_list[word_index + 1:word_index + 5]]
-            right_words = ' '.join(right_words)
-            forward_words = [wd[0] for wd in word_duration_tuple_list[word_index + 5:]]
-            forward_words = ' '.join(forward_words)
-        else:
-            right_words = [wd[0] for wd in word_duration_tuple_list[word_index + 1:len(word_duration_tuple_list)]]
-            right_words = ' '.join(right_words)
-            forward_words = None
-        word = word_duration_tuple_list[word_index][0]
         highlight_index = switch(len(word))
         show_word.tag_config("left", font=('Merriweather', 36))
         show_word.tag_config("word", font=('Merriweather', 60))
@@ -298,12 +284,11 @@ def display_word(word_duration_tuple_list, word_index, num_words):
             top_label.config(text=previous_words)
         if forward_words:
             bottom_label.config(text=forward_words)
-        _, _, _, _ = display_queue.get()
-        next_display_id = root.after(word_duration_tuple_list[word_index][1], display_word, word_duration_tuple_list,
-                                     word_index + 1, num_words)
-        display_queue.put((word_duration_tuple_list, word_index + 1, num_words, next_display_id,))
-    elif word_index >= num_words:
-        _, _, _, _ = display_queue.get()
+        _, _ = display_queue.get()
+        next_display_id = root.after(word_time, display_word, word_index+1, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list)
+        display_queue.put((word_index+1, next_display_id,))
+    elif word_index >= len(words_list):
+        _, _ = display_queue.get()
         displaying.set(False)
 
 
@@ -338,6 +323,43 @@ def generate_filename():
     return filename
 
 
+def generate_words(word_duration_tuple_list):
+    left_words_list = []
+    right_words_list = []
+    previous_words_list = []
+    forward_words_list = []
+    words_list = []
+    words_time_list = []
+    for word_index in range(len(word_duration_tuple_list)):
+        if word_index - 5 >= 0:
+            left_words = [wd[0] for wd in word_duration_tuple_list[word_index - 5:word_index]]
+            left_words = ' '.join(left_words)
+            previous_words = [wd[0] for wd in word_duration_tuple_list[:word_index - 5]]
+            previous_words = ' '.join(previous_words)
+        else:
+            left_words = [wd[0] for wd in word_duration_tuple_list[0:word_index]]
+            left_words = ' '.join(left_words)
+            previous_words = None
+        if word_index + 5 < len(word_duration_tuple_list):
+            right_words = [wd[0] for wd in word_duration_tuple_list[word_index + 1:word_index + 5]]
+            right_words = ' '.join(right_words)
+            forward_words = [wd[0] for wd in word_duration_tuple_list[word_index + 5:]]
+            forward_words = ' '.join(forward_words)
+        else:
+            right_words = [wd[0] for wd in word_duration_tuple_list[word_index + 1:len(word_duration_tuple_list)]]
+            right_words = ' '.join(right_words)
+            forward_words = None
+        word = word_duration_tuple_list[word_index][0]
+        word_time = word_duration_tuple_list[word_index][1]
+        left_words_list.append(left_words)
+        right_words_list.append(right_words)
+        previous_words_list.append(previous_words)
+        forward_words_list.append(forward_words)
+        words_list.append(word)
+        words_time_list.append(word_time)
+    return words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list
+
+
 def start_audio_and_display(index):
     global ssml_strings
     if index >= len(ssml_strings):
@@ -349,9 +371,11 @@ def start_audio_and_display(index):
     file_path = os.path.join(temp_dir, f'{generate_filename()}.wav')
     synthesizer = get_speech_synthesizer(file_path)
     milliseconds_audio_duration, words_with_duration = speak(synthesizer, ssml_string)
-
+    global words_with_duration_main
+    words_with_duration_main = words_with_duration.copy()
     logging.info(
         f"Audio Duration {timedelta(microseconds=milliseconds_audio_duration * 1000)}, words {len(words_with_duration)}")
+    logging.info(f"WPM: {len(words_with_duration)/(timedelta(microseconds=milliseconds_audio_duration*1000).seconds/60)}")
     logging.info(f"Scheduling next index after {timedelta(microseconds=milliseconds_audio_duration * 1000)}")
 
     if playing.get() is True:
@@ -363,12 +387,12 @@ def start_audio_and_display(index):
     execution_stack.put(next_id)
 
     playing.set(True)
-    stream, p, wf = play_with_pyaudio(file_path)
-    audio_queue.put((stream, p, wf, index,))
-
     displaying.set(True)
-    next_display_id = root.after(0, display_word, words_with_duration, 0, len(words_with_duration))
-    display_queue.put((words_with_duration, 0, len(words_with_duration), next_display_id,))
+    words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list = generate_words(words_with_duration)
+    stream, p, wf = play_with_pyaudio(file_path)
+    next_display_id = root.after(0, display_word, 0, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list)
+    audio_queue.put((stream, p, wf, index,))
+    display_queue.put((0, next_display_id,))
 
     logging.info(f'Index {index} completed')
 
@@ -376,7 +400,7 @@ def start_audio_and_display(index):
 # create button functions
 def play_pause(evt):
     stream, p, wf, index = audio_queue.get()
-    words_with_duration, word_index, num_words, display_id_under_queue = display_queue.get()
+    word_index, display_id_under_queue = display_queue.get()
     if playing.get() and displaying.get():
         logging.info("Pause Button Pressed")
         # Pause audio
@@ -390,12 +414,13 @@ def play_pause(evt):
         if execution_stack.empty() is False:
             root.after_cancel(execution_stack.get())
         audio_queue.put((stream, p, wf, index,))
-        display_queue.put((words_with_duration, word_index, num_words, None,))
+        display_queue.put((word_index, None,))
     elif not playing.get() and not displaying.get():
         logging.info("Play Button Pressed")
-
+        global words_with_duration_main
+        words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list = generate_words(words_with_duration_main)
         left_time = 0
-        for _, t in words_with_duration[word_index:]:
+        for t in words_time_list[word_index:]:
             left_time += t
         # schedule next execution
         next_id = root.after(left_time, start_audio_and_display, index + 1)
@@ -407,14 +432,14 @@ def play_pause(evt):
 
         # Start display
         displaying.set(True)
-        next_display_id = root.after(0, display_word, words_with_duration, word_index, len(words_with_duration))
-        display_queue.put((words_with_duration, 0, len(words_with_duration), next_display_id,))
+        next_display_id = root.after(0, display_word, word_index, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list)
+        display_queue.put((word_index, next_display_id,))
 
 
 def back(evt):
     logging.info("Back Button Pressed")
     stream, p, wf, index = audio_queue.get()
-    words_with_duration, word_index, num_words, display_id_under_queue = display_queue.get()
+    _, display_id_under_queue = display_queue.get()
     # stop playing
     stream.close()
     playing.set(False)
@@ -436,7 +461,7 @@ def back(evt):
 def restart(evt):
     logging.info("Restart Button Pressed")
     stream, p, wf, index = audio_queue.get()
-    words_with_duration, word_index, num_words, display_id_under_queue = display_queue.get()
+    _, display_id_under_queue = display_queue.get()
     # stop playing
     stream.close()
     playing.set(False)
@@ -458,7 +483,7 @@ def restart(evt):
 def skip(evt):
     logging.info("Skip Button Pressed")
     stream, p, wf, index = audio_queue.get()
-    words_with_duration, word_index, num_words, display_id_under_queue = display_queue.get()
+    _, display_id_under_queue = display_queue.get()
     # stop playing
     stream.close()
     playing.set(False)
@@ -481,12 +506,12 @@ if __name__ == '__main__':
     ssml_strings, start_index = initial_setup()
     root = tk.Tk()
     root.eval('tk::PlaceWindow . center')
-    root.geometry("2560x1440")
     audio_queue = Queue()
     display_queue = Queue()
     execution_stack = LifoQueue()
     playing = tk.BooleanVar()
     displaying = tk.BooleanVar()
+    words_with_duration_main = []
     with tempfile.TemporaryDirectory() as temp_dir:
         # create buttons with hotkeys
         play_button = tk.Button(root, text="Play", command=lambda: play_pause(None))
