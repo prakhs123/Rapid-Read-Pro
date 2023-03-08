@@ -14,6 +14,7 @@ from queue import Queue, LifoQueue
 
 import azure.cognitiveservices.speech as speechsdk
 import pyaudio
+import pyglet
 from bs4 import BeautifulSoup
 from ebooklib import epub
 from requests_html import HTMLSession
@@ -68,7 +69,7 @@ def get_speech_synthesizer(file_path):
     # This example requires environment variables named "SPEECH_KEY" and "SPEECH_REGION"
     speech_config = speechsdk.SpeechConfig(subscription=os.environ.get('SPEECH_KEY'),
                                            region=os.environ.get('SPEECH_REGION'))
-    speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Riff48Khz16BitMonoPcm)
+    speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Ogg48Khz16BitMonoOpus)
     audio_config = speechsdk.audio.AudioOutputConfig(filename=file_path)
     return speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
 
@@ -292,6 +293,22 @@ def display_word(word_index, words_list, words_time_list, left_words_list, right
         displaying.set(False)
 
 
+def on_player_eos(player, tts):
+    logging.info("Playback completed")
+    player.delete()
+    tts.delete()
+    playing.set(False)
+    audio_queue.get()
+
+
+def play_with_pyglet_ogg(file_path):
+    tts = pyglet.media.load(file_path)
+    td_duration = timedelta(seconds=tts.duration)
+    audio_duration = round(td_duration.seconds*1000+td_duration.microseconds/1000)
+    player = tts.play()
+    return player, tts, audio_duration
+
+
 def play_with_pyaudio(file_path):
     wf = wave.open(file_path, 'rb')
 
@@ -368,7 +385,7 @@ def start_audio_and_display(index):
     logging.info(f"Current Index: {index}")
     logging.info(f"Reading from start_token: {start_token}, end_token {end_token}")
 
-    file_path = os.path.join(temp_dir, f'{generate_filename()}.wav')
+    file_path = os.path.join(temp_dir, f'{generate_filename()}.opus')
     synthesizer = get_speech_synthesizer(file_path)
     milliseconds_audio_duration, words_with_duration = speak(synthesizer, ssml_string)
     global words_with_duration_main
@@ -389,9 +406,10 @@ def start_audio_and_display(index):
     playing.set(True)
     displaying.set(True)
     words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list = generate_words(words_with_duration)
-    stream, p, wf = play_with_pyaudio(file_path)
+    player, tts, audio_duration = play_with_pyglet_ogg(file_path)
+    curr_player_id = root.after(audio_duration, on_player_eos, player, tts)
     next_display_id = root.after(0, display_word, 0, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list)
-    audio_queue.put((stream, p, wf, index,))
+    audio_queue.put((player, tts, curr_player_id, index,))
     display_queue.put((0, next_display_id,))
 
     logging.info(f'Index {index} completed')
@@ -399,12 +417,14 @@ def start_audio_and_display(index):
 
 # create button functions
 def play_pause(evt):
-    stream, p, wf, index = audio_queue.get()
+    player, tts, curr_player_id, index = audio_queue.get()
     word_index, display_id_under_queue = display_queue.get()
     if playing.get() and displaying.get():
         logging.info("Pause Button Pressed")
         # Pause audio
-        stream.stop_stream()
+        player.pause()
+        if curr_player_id:
+            root.after_cancel(curr_player_id)
         playing.set(False)
         # Cancel next display
         if display_id_under_queue:
@@ -413,7 +433,7 @@ def play_pause(evt):
         # stop next execution
         if execution_stack.empty() is False:
             root.after_cancel(execution_stack.get())
-        audio_queue.put((stream, p, wf, index,))
+        audio_queue.put((player, tts, None, index,))
         display_queue.put((word_index, None,))
     elif not playing.get() and not displaying.get():
         logging.info("Play Button Pressed")
@@ -426,9 +446,10 @@ def play_pause(evt):
         next_id = root.after(left_time, start_audio_and_display, index + 1)
         execution_stack.put(next_id)
         # Start audio
-        audio_queue.put((stream, p, wf, index,))
+        curr_player_id = root.after(left_time, on_player_eos, player, tts)
+        audio_queue.put((player, tts, curr_player_id, index,))
         playing.set(True)
-        stream.start_stream()
+        player.play()
 
         # Start display
         displaying.set(True)
@@ -438,18 +459,18 @@ def play_pause(evt):
 
 def back(evt):
     logging.info("Back Button Pressed")
-    stream, p, wf, index = audio_queue.get()
+    player, tts, curr_player_id, index = audio_queue.get()
     _, display_id_under_queue = display_queue.get()
     # stop playing
-    stream.close()
     playing.set(False)
+    player.delete()
+    tts.delete()
+    if curr_player_id:
+        root.after_cancel(curr_player_id)
     # Cancel next display
     if display_id_under_queue:
         root.after_cancel(display_id_under_queue)
     displaying.set(False)
-    # clear file variables
-    p.terminate()
-    wf.close()
     # Cancel next execution
     if execution_stack.empty() is False:
         root.after_cancel(execution_stack.get())
@@ -460,18 +481,18 @@ def back(evt):
 
 def restart(evt):
     logging.info("Restart Button Pressed")
-    stream, p, wf, index = audio_queue.get()
+    player, tts, curr_player_id, index = audio_queue.get()
     _, display_id_under_queue = display_queue.get()
     # stop playing
-    stream.close()
+    player.delete()
+    tts.delete()
     playing.set(False)
+    if curr_player_id:
+        root.after_cancel(curr_player_id)
     # Cancel next display
     if display_id_under_queue:
         root.after_cancel(display_id_under_queue)
     displaying.set(False)
-    # Clear file variables
-    p.terminate()
-    wf.close()
     # Cancel next execution
     if execution_stack.empty() is False:
         root.after_cancel(execution_stack.get())
@@ -482,18 +503,18 @@ def restart(evt):
 
 def skip(evt):
     logging.info("Skip Button Pressed")
-    stream, p, wf, index = audio_queue.get()
+    player, tts, curr_player_id, index = audio_queue.get()
     _, display_id_under_queue = display_queue.get()
     # stop playing
-    stream.close()
+    player.delete()
+    tts.delete()
     playing.set(False)
+    if curr_player_id:
+        root.after_cancel(curr_player_id)
     # Cancel next display
     if display_id_under_queue:
         root.after_cancel(display_id_under_queue)
     displaying.set(False)
-    # clear file variables
-    p.terminate()
-    wf.close()
     # cancel next execution
     if execution_stack.empty() is False:
         root.after_cancel(execution_stack.get())
