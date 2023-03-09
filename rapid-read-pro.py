@@ -5,6 +5,7 @@ import random
 import string
 import sys
 import tempfile
+import threading
 import tkinter as tk
 import wave
 import xml.etree.ElementTree as ET
@@ -258,10 +259,9 @@ def switch(word_length):
     }.get(word_length, 4)  # Fifth letter
 
 
-def display_word(word_index, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list):
-    if displaying.get() is True and word_index < len(words_list):
-        word, word_time, left_words, right_words, previous_words, forward_words = \
-            words_list[word_index], words_time_list[word_index], left_words_list[word_index], right_words_list[word_index], previous_words_list[word_index], forward_words_list[word_index]
+def display_word():
+    word_index, num_words, word, word_time, left_words, right_words, previous_words, forward_words = curr_display_queue.get()
+    if displaying.get() is True and word_index < num_words:
         show_word.delete("1.0", tk.END)
         highlight_index = switch(len(word))
         show_word.tag_config("left", font=('Merriweather', 36))
@@ -284,11 +284,11 @@ def display_word(word_index, words_list, words_time_list, left_words_list, right
             top_label.config(text=previous_words)
         if forward_words:
             bottom_label.config(text=forward_words)
-        _, _ = display_queue.get()
-        next_display_id = root.after(word_time, display_word, word_index+1, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list)
-        display_queue.put((word_index+1, next_display_id,))
-    elif word_index >= len(words_list):
-        _, _ = display_queue.get()
+        # _, _ = display_queue.get()
+        # next_display_id = root.after(word_time, display_word, word_index+1, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list)
+        # display_queue.put((word_index+1, next_display_id,))
+    elif word_index >= num_words:
+        # _, _ = display_queue.get()
         displaying.set(False)
 
 
@@ -386,14 +386,14 @@ def start_audio_and_display(index):
     if displaying.get() is True:
         root.wait_variable(displaying)
 
-    next_id = root.after(milliseconds_audio_duration, start_audio_and_display, index + 1)
-    execution_stack.put(next_id)
+    # next_id = root.after(milliseconds_audio_duration, start_audio_and_display, index + 1)
+    # execution_stack.put(next_id)
 
     playing.set(True)
     displaying.set(True)
-    stream, p, wf = play_with_pyaudio(file_path)
-    next_display_id = root.after(0, display_word, 0, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list)
-    audio_queue.put((stream, p, wf, index,))
+    # stream, p, wf = play_with_pyaudio(file_path)
+    next_display_id = root.after(0, display_word, )
+    # audio_queue.put((stream, p, wf, index,))
     display_queue.put((0, next_display_id,))
 
     logging.info(f'Index {index} completed')
@@ -510,6 +510,7 @@ if __name__ == '__main__':
     root.eval('tk::PlaceWindow . center')
     audio_queue = Queue()
     display_queue = Queue()
+    curr_display_queue = Queue()
     execution_stack = LifoQueue()
     playing = tk.BooleanVar()
     displaying = tk.BooleanVar()
@@ -550,5 +551,27 @@ if __name__ == '__main__':
             root.rowconfigure(i, weight=1)
         for i in range(5):
             root.columnconfigure(i, weight=1)
-        execution_stack.put(root.after(0, start_audio_and_display, start_index))
+        if start_index >= len(ssml_strings):
+            sys.exit(0)
+        ssml_string, total_tokens, start_token, end_token = ssml_strings[start_index]
+        logging.info(f"Current Index: {start_index}")
+        logging.info(f"Reading from start_token: {start_token}, end_token {end_token}")
+
+        file_path = os.path.join(temp_dir, f'{generate_filename()}.wav')
+        synthesizer = get_speech_synthesizer(file_path)
+        milliseconds_audio_duration, words_with_duration = speak(synthesizer, ssml_string)
+        logging.info(
+            f"Audio Duration {timedelta(microseconds=milliseconds_audio_duration * 1000)}, words {len(words_with_duration)}")
+        logging.info(
+            f"WPM: {len(words_with_duration) / (timedelta(microseconds=milliseconds_audio_duration * 1000).seconds / 60)}")
+        logging.info(f"Scheduling next index after {timedelta(microseconds=milliseconds_audio_duration * 1000)}")
+
+        words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list = generate_words(
+            words_with_duration)
+        for word_index in range(len(words_list)):
+            word, word_time, left_words, right_words, previous_words, forward_words = \
+                words_list[word_index], words_time_list[word_index], left_words_list[word_index], right_words_list[
+                    word_index], \
+                previous_words_list[word_index], forward_words_list[word_index]
+            curr_display_queue.put((word_index, len(words_list), word, word_time, left_words, right_words, previous_words, forward_words))
         root.mainloop()
