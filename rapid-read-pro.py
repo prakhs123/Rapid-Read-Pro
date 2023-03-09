@@ -395,6 +395,7 @@ def start_audio_and_display(index):
     logging.info(f"Reading from start_token: {start_token}, end_token {end_token}")
 
     file_path = os.path.join(temp_dir, f'{generate_filename()}.wav')
+    logging.info(file_path)
     synthesizer = get_speech_synthesizer(file_path)
     milliseconds_audio_duration, words_offset_duration = speak(synthesizer, ssml_string)
     global words_offset_duration_main
@@ -416,7 +417,7 @@ def start_audio_and_display(index):
         curr_display_queue.put(
             (word_index, len(words_list), word, word_time, left_words, right_words, previous_words, forward_words, words_offset_duration[word_index][1]))
 
-    next_id = root.after(milliseconds_audio_duration+1000, start_audio_and_display, index + 1)
+    next_id = root.after(milliseconds_audio_duration, start_audio_and_display, index + 1)
     execution_stack.put(next_id)
 
     playing.set(True)
