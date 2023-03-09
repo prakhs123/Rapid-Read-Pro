@@ -6,6 +6,9 @@ import string
 import sys
 import tempfile
 import threading
+import time
+
+from just_playback import Playback
 import tkinter as tk
 import wave
 import xml.etree.ElementTree as ET
@@ -259,9 +262,15 @@ def switch(word_length):
     }.get(word_length, 4)  # Fifth letter
 
 
-def display_word():
+def pause_audio_for_syncing(playback):
+    playback.pause()
+    time.sleep(1)
+    playback.resume()
+
+
+def display_word(playback):
     if displaying.get() is True:
-        word_index, num_words, word, word_time, left_words, right_words, previous_words, forward_words = curr_display_queue.get()
+        word_index, num_words, word, word_time, left_words, right_words, previous_words, forward_words, word_offset = curr_display_queue.get()
         if word_index < num_words:
             show_word.delete("1.0", tk.END)
             highlight_index = switch(len(word))
@@ -290,10 +299,21 @@ def display_word():
                 bottom_label.insert("end", forward_words)
                 bottom_label.tag_add("center", "1.0", "end")
             _, _ = display_queue.get()
-            next_display_id = root.after(word_time, display_word)
-            display_queue.put((word_index+1, next_display_id,))
+            # SYNC
             if word_index == num_words-1:
+                while playback.playing:
+                    time.sleep(0.1)
+                playback.stop()
+                audio_queue.get()
                 displaying.set(False)
+                playing.set(False)
+                return
+            next_display_id = root.after(word_time, display_word, playback)
+            display_queue.put((word_index+1, next_display_id,))
+            if round(playback.curr_pos * 1000) - (word_offset + word_time) > 1000:
+                logging.info("SYNCING")
+                threading.Thread(target=pause_audio_for_syncing, args=(playback, ), daemon=True).start()
+
 
 
 def play_with_pyaudio(file_path):
@@ -319,6 +339,12 @@ def play_with_pyaudio(file_path):
                     output=True,
                     stream_callback=callback)
     return stream, p, wf
+
+
+def play_with_playback(file_path):
+    playback = Playback()  # creates an object for managing playback of a single audio file
+    playback.load_file(file_path)
+    return playback
 
 
 def generate_filename():
@@ -393,16 +419,18 @@ def start_audio_and_display(index):
                 word_index], \
             previous_words_list[word_index], forward_words_list[word_index]
         curr_display_queue.put(
-            (word_index, len(words_list), word, word_time, left_words, right_words, previous_words, forward_words))
+            (word_index, len(words_list), word, word_time, left_words, right_words, previous_words, forward_words, words_offset_duration[word_index][1]))
 
     next_id = root.after(milliseconds_audio_duration, start_audio_and_display, index + 1)
     execution_stack.put(next_id)
 
     playing.set(True)
     displaying.set(True)
-    stream, p, wf = play_with_pyaudio(file_path)
-    next_display_id = root.after(0, display_word, )
-    audio_queue.put((stream, p, wf, index,))
+    # stream, p, wf = play_with_pyaudio(file_path)
+    playback = play_with_playback(file_path)
+    playback.play()
+    next_display_id = root.after(0, display_word, playback)
+    audio_queue.put((playback, index,))
     display_queue.put((0, next_display_id,))
 
     logging.info(f'Index {index} completed')
@@ -410,12 +438,12 @@ def start_audio_and_display(index):
 
 # create button functions
 def play_pause(evt):
-    stream, p, wf, index = audio_queue.get()
+    playback, index = audio_queue.get()
     word_index, display_id_under_queue = display_queue.get()
     if playing.get() and displaying.get():
         logging.info("Pause Button Pressed")
         # Pause audio
-        stream.stop_stream()
+        playback.pause()
         playing.set(False)
         # Cancel next display
         if display_id_under_queue:
@@ -424,7 +452,7 @@ def play_pause(evt):
         # stop next execution
         if execution_stack.empty() is False:
             root.after_cancel(execution_stack.get())
-        audio_queue.put((stream, p, wf, index,))
+        audio_queue.put((playback, index,))
         display_queue.put((word_index, None,))
     elif not playing.get() and not displaying.get():
         logging.info("Play Button Pressed")
@@ -435,22 +463,22 @@ def play_pause(evt):
         next_id = root.after(time_left, start_audio_and_display, index + 1)
         execution_stack.put(next_id)
         # Start audio
-        audio_queue.put((stream, p, wf, index,))
+        audio_queue.put((playback, index,))
         playing.set(True)
-        stream.start_stream()
+        playback.resume()
 
         # Start display
         displaying.set(True)
-        next_display_id = root.after(0, display_word,)
+        next_display_id = root.after(0, display_word, playback)
         display_queue.put((word_index, next_display_id,))
 
 
 def back(evt):
     logging.info("Back Button Pressed")
-    stream, p, wf, index = audio_queue.get()
+    playback, index = audio_queue.get()
     _, display_id_under_queue = display_queue.get()
     # stop playing
-    stream.close()
+    playback.stop()
     playing.set(False)
     # Cancel next display
     if display_id_under_queue:
@@ -458,9 +486,6 @@ def back(evt):
     while not curr_display_queue.empty():
         curr_display_queue.get()
     displaying.set(False)
-    # clear file variables
-    p.terminate()
-    wf.close()
     # Cancel next execution
     if execution_stack.empty() is False:
         root.after_cancel(execution_stack.get())
@@ -471,10 +496,10 @@ def back(evt):
 
 def restart(evt):
     logging.info("Restart Button Pressed")
-    stream, p, wf, index = audio_queue.get()
+    playback, index = audio_queue.get()
     _, display_id_under_queue = display_queue.get()
     # stop playing
-    stream.close()
+    playback.stop()
     playing.set(False)
     # Cancel next display
     if display_id_under_queue:
@@ -482,9 +507,6 @@ def restart(evt):
     while not curr_display_queue.empty():
         curr_display_queue.get()
     displaying.set(False)
-    # Clear file variables
-    p.terminate()
-    wf.close()
     # Cancel next execution
     if execution_stack.empty() is False:
         root.after_cancel(execution_stack.get())
@@ -495,10 +517,10 @@ def restart(evt):
 
 def skip(evt):
     logging.info("Skip Button Pressed")
-    stream, p, wf, index = audio_queue.get()
+    playback, index = audio_queue.get()
     _, display_id_under_queue = display_queue.get()
     # stop playing
-    stream.close()
+    playback.stop()
     playing.set(False)
     # Cancel next display
     if display_id_under_queue:
@@ -506,9 +528,6 @@ def skip(evt):
     while not curr_display_queue.empty():
         curr_display_queue.get()
     displaying.set(False)
-    # clear file variables
-    p.terminate()
-    wf.close()
     # cancel next execution
     if execution_stack.empty() is False:
         root.after_cancel(execution_stack.get())
