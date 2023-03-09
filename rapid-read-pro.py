@@ -262,12 +262,6 @@ def switch(word_length):
     }.get(word_length, 4)  # Fifth letter
 
 
-def pause_audio_for_syncing(playback):
-    playback.pause()
-    time.sleep(1)
-    playback.resume()
-
-
 def display_word(playback):
     if displaying.get() is True:
         word_index, num_words, word, word_time, left_words, right_words, previous_words, forward_words, word_offset = curr_display_queue.get()
@@ -310,10 +304,11 @@ def display_word(playback):
                 return
             next_display_id = root.after(word_time, display_word, playback)
             display_queue.put((word_index+1, next_display_id,))
-            if round(playback.curr_pos * 1000) - (word_offset + word_time) > 1000:
-                logging.info("SYNCING")
-                threading.Thread(target=pause_audio_for_syncing, args=(playback, ), daemon=True).start()
-
+            if round(playback.curr_pos * 1000) - (word_offset + word_time) > 400:
+                logging.info(f"SYNCING {((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000)}")
+                playback.pause()
+                time.sleep(((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000))
+                playback.resume()
 
 
 def play_with_pyaudio(file_path):
@@ -391,6 +386,10 @@ def generate_words(word_duration_tuple_list):
 
 
 def start_audio_and_display(index):
+    if playing.get() is True:
+        root.wait_variable(playing)
+    if displaying.get() is True:
+        root.wait_variable(displaying)
     ssml_string, total_tokens, start_token, end_token = ssml_strings[index]
     logging.info(f"Current Index: {index}")
     logging.info(f"Reading from start_token: {start_token}, end_token {end_token}")
@@ -408,10 +407,6 @@ def start_audio_and_display(index):
 
     words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list = generate_words(
         words_offset_duration)
-    if playing.get() is True:
-        root.wait_variable(playing)
-    if displaying.get() is True:
-        root.wait_variable(displaying)
 
     for word_index in range(len(words_list)):
         word, word_time, left_words, right_words, previous_words, forward_words = \
@@ -421,7 +416,7 @@ def start_audio_and_display(index):
         curr_display_queue.put(
             (word_index, len(words_list), word, word_time, left_words, right_words, previous_words, forward_words, words_offset_duration[word_index][1]))
 
-    next_id = root.after(milliseconds_audio_duration, start_audio_and_display, index + 1)
+    next_id = root.after(milliseconds_audio_duration+1000, start_audio_and_display, index + 1)
     execution_stack.put(next_id)
 
     playing.set(True)
@@ -539,7 +534,6 @@ def skip(evt):
 if __name__ == '__main__':
     ssml_strings, start_index = initial_setup()
     root = tk.Tk()
-    root.eval('tk::PlaceWindow . center')
     audio_queue = Queue()
     display_queue = Queue()
     curr_display_queue = Queue()
