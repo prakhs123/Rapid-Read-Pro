@@ -78,7 +78,7 @@ def create_ssml_string(text, doc_tag, emphasis_level):
     return f"""
         <{doc_tag}>
             <mstts:express-as style="narration-professional">
-                <prosody rate="+40.00%">
+                <prosody rate="+10.00%">
                     <emphasis level="{emphasis_level}">
                         {text}
                     </emphasis>
@@ -173,7 +173,7 @@ def speak(synthesizer, ssml_string):
     word_durations.append(last_duration)
     words_with_audio_offset = [(w, round(a.seconds * 1000 + a.microseconds / 1000)) for w, a in
                                zip(words, word_durations)]
-    return round(audio_duration.seconds * 1000 + audio_duration.microseconds / 1000), words_with_audio_offset
+    return sum(a for _, a in words_with_audio_offset), words_with_audio_offset
 
 
 def parse_args():
@@ -378,6 +378,9 @@ def start_audio_and_display(index):
     logging.info(f"WPM: {len(words_with_duration)/(timedelta(microseconds=milliseconds_audio_duration*1000).seconds/60)}")
     logging.info(f"Scheduling next index after {timedelta(microseconds=milliseconds_audio_duration * 1000)}")
 
+    words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list = generate_words(
+        words_with_duration)
+
     if playing.get() is True:
         root.wait_variable(playing)
     if displaying.get() is True:
@@ -388,7 +391,6 @@ def start_audio_and_display(index):
 
     playing.set(True)
     displaying.set(True)
-    words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list = generate_words(words_with_duration)
     stream, p, wf = play_with_pyaudio(file_path)
     next_display_id = root.after(0, display_word, 0, words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list)
     audio_queue.put((stream, p, wf, index,))
