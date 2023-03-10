@@ -5,7 +5,6 @@ import random
 import string
 import sys
 import tempfile
-import threading
 import time
 
 from just_playback import Playback
@@ -57,6 +56,18 @@ def display_text_that_will_be_converted_to_speech(text):
     logging.debug(text)
 
 
+def extract_first_emphasis_text(xml_string):
+    # Parse the XML string into an ElementTree object
+    xml_root = ET.fromstring(xml_string)
+
+    # Find the first emphasis tag and extract its text
+    emphasis = xml_root.find('.//{*}emphasis')
+    emphasis_text = emphasis.text.strip() if emphasis is not None else ""
+
+    # Return the emphasis text
+    return emphasis_text
+
+
 def extract_emphasis_text(xml_string):
     # Parse the XML string into an ElementTree object
     xml_root = ET.fromstring(xml_string)
@@ -82,7 +93,7 @@ def create_ssml_string(text, doc_tag, emphasis_level):
     return f"""
         <{doc_tag}>
             <mstts:express-as style="narration-professional">
-                <prosody rate="+10.00%">
+                <prosody rate="+40.00%">
                     <emphasis level="{emphasis_level}">
                         {text}
                     </emphasis>
@@ -186,11 +197,11 @@ def parse_args():
                         help='path to the EPUB/HTML file to convert to speech')
     parser.add_argument('--get-available-voices', type=str, default=None,
                         help="Enter a locale in BCP-47 format (e.g. en-US) that you want to get the voices of")
-    parser.add_argument('--num-tokens', type=int, default=1,
+    parser.add_argument('--num-tokens', type=int, default=50,
                         help='number of tokens in one ssml string, default 1')
-    parser.add_argument('--item-page', type=int, default=0,
+    parser.add_argument('--item-page', type=int, default=None,
                         help='index of the page in the EPUB file to convert to speech')
-    parser.add_argument('--start-index', type=int, default=0,
+    parser.add_argument('--start-index', type=int, default=None,
                         help='index of ssml string to start speech')
     return parser.parse_args()
 
@@ -209,8 +220,9 @@ def initial_setup():
             book = epub.read_epub(args.epub_or_html_file)
             items = [item for item in book.get_items() if item.get_type() == 9]
             for pg_no, item in enumerate(items):
-                print(pg_no, item.file_name)
-            item_page = int(input("Enter Item Page to read"))
+                logging.info(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}")
+            if not item_page:
+                item_page = int(input("Enter Item Page to read"))
             item = items[item_page]
             html = item.get_content()
         elif args.epub_or_html_file.startswith('http'):
@@ -237,9 +249,9 @@ def initial_setup():
         contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
     ssml_strings = create_ssml_strings(contents, 0, num_tokens)
     for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ssml_strings):
-        logging.info(
-            f"Index: {i}, total_tokens: {total_tokens}, start_token: {start_token}, end_token: {end_token}")
-
+        logging.info(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
+    if not start_index:
+        start_index = int(input("Enter start index to read"))
     return ssml_strings, start_index
 
 
