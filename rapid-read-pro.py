@@ -245,7 +245,7 @@ def initial_setup():
         elif soup.section:
             contents = soup.section.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
     else:
-        contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
+        contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd'])
     ssml_strings = create_ssml_strings(contents, 0, num_tokens)
     for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ssml_strings):
         logging.info(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
@@ -279,32 +279,34 @@ def display_word(playback):
     if displaying.get() is True:
         word_index, num_words, word, word_time, left_words, right_words, previous_words, forward_words, word_offset = curr_display_queue.get()
         if word_index < num_words:
-            show_word.delete("1.0", tk.END)
+            center_text.delete("1.0", tk.END)
             highlight_index = switch(len(word))
-            show_word.tag_config("left", font=('Merriweather', 36))
-            show_word.tag_config("word", font=('Merriweather', 60))
-            show_word.tag_config("right", font=('Merriweather', 36))
-            show_word.insert("end", left_words, "left")
-            show_word.insert("end", " ")
-            show_word.insert("end", word, "word")
-            show_word.insert("end", " ")
-            show_word.insert("end", right_words, "right")
+            center_text.tag_config("left", font=('Merriweather', 36))
+            center_text.tag_config("word", font=('Merriweather', 60))
+            center_text.tag_config("right", font=('Merriweather', 36))
+            center_text.insert("end", left_words, "left")
+            center_text.insert("end", " ")
+            center_text.insert("end", word, "word")
+            center_text.insert("end", " ")
+            center_text.insert("end", right_words, "right")
             center_tag = "center"
-            show_word.tag_configure(center_tag, justify="center")
-            show_word.tag_add("center", "1.0", "end")
-            s_index = show_word.search(word, "1.0", "end")
+            center_text.tag_configure(center_tag, justify="center")
+            center_text.tag_add("center", "1.0", "end")
+            s_index = center_text.search(word, "1.0", "end")
             e_index = f"{s_index}+{len(word)}c"
-            show_word.tag_add(center_tag, s_index, e_index)
-            show_word.tag_config("highlight", foreground="#F57A10")
-            show_word.tag_add("highlight", f"1.{len(left_words) + 1 + highlight_index + 1}")
+            center_text.tag_add(center_tag, s_index, e_index)
+            center_text.tag_config("highlight", foreground="#F57A10")
+            center_text.tag_add("highlight", f"1.{len(left_words) + 1 + highlight_index + 1}")
             if previous_words:
-                top_label.delete("1.0", tk.END)
-                top_label.insert("end", previous_words)
-                top_label.tag_add("center", "1.0", "end")
+                previous_words = '\n'*(18-(len(previous_words)//200)) + previous_words
+                top_text.delete("1.0", tk.END)
+                top_text.insert(f"end", previous_words)
+                top_text.tag_add("center", "1.0", "end")
             if forward_words:
-                bottom_label.delete("1.0", tk.END)
-                bottom_label.insert("end", forward_words)
-                bottom_label.tag_add("center", "1.0", "end")
+                forward_words = '\n' + forward_words
+                bottom_text.delete("1.0", tk.END)
+                bottom_text.insert("end", forward_words)
+                bottom_text.tag_add("center", "1.0", "end")
             _, _ = display_queue.get()
             # SYNC
             if word_index == num_words-1:
@@ -317,7 +319,7 @@ def display_word(playback):
                 return
             next_display_id = root.after(word_time, display_word, playback)
             display_queue.put((word_index+1, next_display_id,))
-            if round(playback.curr_pos * 1000) - (word_offset + word_time) > 400:
+            if round(playback.curr_pos * 1000) - (word_offset + word_time) > 625:
                 logging.debug(f"SYNCING {((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000)}")
                 playback.pause()
                 time.sleep(((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000))
@@ -570,22 +572,22 @@ if __name__ == '__main__':
         skip_button = tk.Button(root, text="Skip", command=lambda: skip(None))
         root.bind("s", lambda event: skip(event))
 
-        play_button.grid(row=5, column=0, sticky="sew")
-        pause_button.grid(row=5, column=1, sticky="sew")
-        back_button.grid(row=5, column=2, sticky="sew")
-        restart_button.grid(row=5, column=3, sticky="sew")
-        skip_button.grid(row=5, column=4, sticky="sew")
+        play_button.grid(row=9, column=0, sticky="sew")
+        pause_button.grid(row=9, column=1, sticky="sew")
+        back_button.grid(row=9, column=2, sticky="sew")
+        restart_button.grid(row=9, column=3, sticky="sew")
+        skip_button.grid(row=9, column=4, sticky="sew")
 
-        top_label = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=24, width=50)
-        top_label.tag_configure("center", justify='center')
-        top_label.grid(row=0, column=0, rowspan=2, columnspan=5, sticky="ew")
-        show_word = tk.Text(root, font=('Merriweather', 60), bg='#F7ECCF', fg='#77614F', height=3)
-        show_word.grid(row=2, rowspan=1, column=0, columnspan=5, sticky="ew")
-        bottom_label = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=24, width=50)
-        bottom_label.tag_configure("center", justify="center")
-        bottom_label.grid(row=3, column=0, rowspan=2, columnspan=5, sticky="sew")
+        top_text = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=20, width=50, wrap="word")
+        top_text.tag_configure("center", justify='center')
+        top_text.grid(row=0, column=0, rowspan=4, columnspan=5, sticky="sew")
+        center_text = tk.Text(root, font=('Merriweather', 60), bg='#F7ECCF', fg='#77614F', height=1, width=50)
+        center_text.grid(row=4, rowspan=1, column=0, columnspan=5, sticky="ew")
+        bottom_text = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=20, width=50, wrap="word")
+        bottom_text.tag_configure("center", justify="center")
+        bottom_text.grid(row=5, column=0, rowspan=4, columnspan=5, sticky="new")
 
-        for i in range(6):
+        for i in range(10):
             root.rowconfigure(i, weight=1)
         for i in range(5):
             root.columnconfigure(i, weight=1)
