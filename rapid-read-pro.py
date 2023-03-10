@@ -213,7 +213,6 @@ def initial_setup():
         speech_synthesis_get_available_voices(locale)
         sys.exit(0)
     item_page = args.item_page
-    start_index = args.start_index
     num_tokens = args.num_tokens
     try:
         if args.epub_or_html_file.endswith('.epub'):
@@ -221,7 +220,7 @@ def initial_setup():
             items = [item for item in book.get_items() if item.get_type() == 9]
             for pg_no, item in enumerate(items):
                 logging.info(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}")
-            if not item_page:
+            if item_page is None:
                 item_page = int(input("Enter Item Page to read"))
             item = items[item_page]
             html = item.get_content()
@@ -250,9 +249,11 @@ def initial_setup():
     ssml_strings = create_ssml_strings(contents, 0, num_tokens)
     for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ssml_strings):
         logging.info(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
-    if not start_index:
-        start_index = int(input("Enter start index to read"))
-    return ssml_strings, start_index
+    if args.start_index is None:
+        si = int(input("Enter start index to read"))
+    else:
+        si = args.start_index
+    return ssml_strings, si
 
 
 def switch(word_length):
@@ -569,20 +570,20 @@ if __name__ == '__main__':
         skip_button = tk.Button(root, text="Skip", command=lambda: skip(None))
         root.bind("s", lambda event: skip(event))
 
-        play_button.grid(row=5, column=0, sticky="nsew")
-        pause_button.grid(row=5, column=1, sticky="nsew")
-        back_button.grid(row=5, column=2, sticky="nsew")
-        restart_button.grid(row=5, column=3, sticky="nsew")
-        skip_button.grid(row=5, column=4, sticky="nsew")
+        play_button.grid(row=5, column=0, sticky="sew")
+        pause_button.grid(row=5, column=1, sticky="sew")
+        back_button.grid(row=5, column=2, sticky="sew")
+        restart_button.grid(row=5, column=3, sticky="sew")
+        skip_button.grid(row=5, column=4, sticky="sew")
 
-        top_label = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=15)
+        top_label = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=24, width=50)
         top_label.tag_configure("center", justify='center')
         top_label.grid(row=0, column=0, rowspan=2, columnspan=5, sticky="ew")
         show_word = tk.Text(root, font=('Merriweather', 60), bg='#F7ECCF', fg='#77614F', height=3)
         show_word.grid(row=2, rowspan=1, column=0, columnspan=5, sticky="ew")
-        bottom_label = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=15)
+        bottom_label = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=24, width=50)
         bottom_label.tag_configure("center", justify="center")
-        bottom_label.grid(row=3, column=0, rowspan=2, columnspan=5, sticky="ew")
+        bottom_label.grid(row=3, column=0, rowspan=2, columnspan=5, sticky="sew")
 
         for i in range(6):
             root.rowconfigure(i, weight=1)
