@@ -318,7 +318,7 @@ def display_word(playback):
             next_display_id = root.after(word_time, display_word, playback)
             display_queue.put((word_index+1, next_display_id,))
             if round(playback.curr_pos * 1000) - (word_offset + word_time) > 400:
-                logging.info(f"SYNCING {((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000)}")
+                logging.debug(f"SYNCING {((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000)}")
                 playback.pause()
                 time.sleep(((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000))
                 playback.resume()
