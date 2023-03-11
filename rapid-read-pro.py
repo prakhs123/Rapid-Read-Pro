@@ -289,29 +289,32 @@ def display_word(playback):
             center_text.config(state=tk.NORMAL)
             center_text.delete("1.0", tk.END)
             highlight_index_word = switch(len(word))
-            diff = (CENTER_TEXT_WIDTH*CENTER_TEXT_HEIGHT)//2-highlight_index_word-1-len(left_words)-1
+            diff = (CENTER_TEXT_WIDTH * CENTER_TEXT_HEIGHT) // 2 - highlight_index_word - 1 - len(left_words) - 1
             left_words_m = ' ' * diff + left_words + ' '
-            diff2 = (CENTER_TEXT_WIDTH*CENTER_TEXT_HEIGHT)//2-(len(word)-highlight_index_word-1+len(right_words)+1)
+            diff2 = (CENTER_TEXT_WIDTH * CENTER_TEXT_HEIGHT) // 2 - (
+                        len(word) - highlight_index_word - 1 + len(right_words) + 1)
             right_words_m = ' ' + right_words + (' ' * diff2)
             full_text = left_words_m + word + right_words_m
-            center_text.tag_add("left_words", "1.0", f"1.{len(left_words_m)-1}")
+            center_text.tag_add("left_words", "1.0", f"1.{len(left_words_m) - 1}")
             center_text.tag_config("left_words")
             center_text.insert(tk.END, left_words_m, "left_words")
-            center_text.tag_add("center_word", f"1.{len(left_words_m)}", f"1.{len(left_words_m)+len(word)-1}")
+            center_text.tag_add("center_word", f"1.{len(left_words_m)}", f"1.{len(left_words_m) + len(word) - 1}")
             center_text.tag_config("center_word", font=(FONT_NAME, WORD_FONT_SIZE))
             center_text.insert(tk.END, word, "center_word")
-            center_text.tag_add("right_words", f"1.{len(left_words_m)+len(word)}", f"1.{len(left_words_m+word+right_words_m)}")
+            center_text.tag_add("right_words", f"1.{len(left_words_m) + len(word)}",
+                                f"1.{len(left_words_m + word + right_words_m)}")
             center_text.tag_config("right_words")
             center_text.insert(tk.END, right_words_m, "right_words")
-            center_width = center_text.winfo_width()//2
-            x_pos = center_text.bbox(f'1.{CENTER_TEXT_WIDTH//2-1}')[0]
+            center_width = center_text.winfo_width() // 2
+            x_pos = center_text.bbox(f'1.{CENTER_TEXT_WIDTH // 2 - 1}')[0]
             center_text.tag_add('lmargin1', "1.0", "1.end")
-            center_text.tag_config('lmargin1', lmargin1=center_width-x_pos)
-            center_text.tag_add("highlight", f"1.{CENTER_TEXT_WIDTH//2-1}")
+            center_text.tag_config('lmargin1', lmargin1=center_width - x_pos)
+            center_text.tag_add("highlight", f"1.{CENTER_TEXT_WIDTH // 2 - 1}")
             center_text.tag_config("highlight", foreground=HIGHLIGHT_COLOR)
             center_text.config(state=tk.DISABLED)
             if previous_words:
-                previous_words = '\n'*(TOP_TEXT_ROWS-2-(len(previous_words)//(TOP_TEXT_HEIGHT*TOP_TEXT_WIDTH))) + previous_words
+                previous_words = '\n' * (TOP_TEXT_ROWS - 2 - (
+                            len(previous_words) // (TOP_TEXT_HEIGHT * TOP_TEXT_WIDTH))) + previous_words
                 top_text.delete("1.0", tk.END)
                 top_text.insert(f"end", previous_words)
                 top_text.tag_add("center", "1.0", "end")
@@ -321,16 +324,21 @@ def display_word(playback):
                 bottom_text.insert("end", forward_words)
                 bottom_text.tag_add("center", "1.0", "end")
             _, _ = display_queue.get()
-            id1 = top_line.create_line(0, top_line.winfo_height()//2, center_text.winfo_width(), top_line.winfo_height()//2, width=top_line_width, fill=top_line_color)
+            id1 = top_line.create_line(0, top_line.winfo_height() // 2, center_text.winfo_width(),
+                                       top_line.winfo_height() // 2, width=top_line_width, fill=top_line_color)
             x_pos = center_text.winfo_width() // 2
-            id2 = top_line.create_line(x_pos, top_line.winfo_height()//2, x_pos, top_line.winfo_height(), width=top_line_width, fill=top_line_color)
+            id2 = top_line.create_line(x_pos, top_line.winfo_height() // 2, x_pos, top_line.winfo_height(),
+                                       width=top_line_width, fill=top_line_color)
             line_queue1.put((id1, id2))
-            id3 = bottom_line.create_line(0, bottom_line.winfo_height()//2, center_text.winfo_width(), bottom_line.winfo_height()//2, width=bottom_line_width, fill=bottom_line_color)
+            id3 = bottom_line.create_line(0, bottom_line.winfo_height() // 2, center_text.winfo_width(),
+                                          bottom_line.winfo_height() // 2, width=bottom_line_width,
+                                          fill=bottom_line_color)
             x_pos = center_text.winfo_width() // 2
-            id4 = bottom_line.create_line(x_pos, bottom_line.winfo_height()//2, x_pos, 0, width=bottom_line_width, fill=bottom_line_color)
+            id4 = bottom_line.create_line(x_pos, bottom_line.winfo_height() // 2, x_pos, 0, width=bottom_line_width,
+                                          fill=bottom_line_color)
             line_queue2.put((id3, id4))
             # SYNC
-            if word_index == num_words-1:
+            if word_index == num_words - 1:
                 while playback.playing:
                     time.sleep(0.1)
                 playback.stop()
@@ -339,7 +347,7 @@ def display_word(playback):
                 playing.set(False)
                 return
             next_display_id = root.after(word_time, display_word, playback)
-            display_queue.put((word_index+1, next_display_id,))
+            display_queue.put((word_index + 1, next_display_id,))
             if playback and round(playback.curr_pos * 1000) - (word_offset + word_time) > 625:
                 logging.debug(f"SYNCING {((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000)}")
                 playback.pause()
@@ -451,7 +459,8 @@ def start_audio_and_display(index):
                 word_index], \
             previous_words_list[word_index], forward_words_list[word_index]
         curr_display_queue.put(
-            (word_index, len(words_list), word, word_time, left_words, right_words, previous_words, forward_words, words_offset_duration[word_index][1]))
+            (word_index, len(words_list), word, word_time, left_words, right_words, previous_words, forward_words,
+             words_offset_duration[word_index][1]))
 
     next_id = root.after(milliseconds_audio_duration, start_audio_and_display, index + 1)
     execution_stack.put(next_id)
@@ -625,14 +634,17 @@ if __name__ == '__main__':
         restart_button.grid(row=11, column=3, sticky="sew")
         skip_button.grid(row=11, column=4, sticky="sew")
 
-        top_text = tk.Text(root, font=(FONT_NAME, TOP_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=TOP_TEXT_HEIGHT, width=TOP_TEXT_WIDTH, wrap="word")
+        top_text = tk.Text(root, font=(FONT_NAME, TOP_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR,
+                           height=TOP_TEXT_HEIGHT, width=TOP_TEXT_WIDTH, wrap="word")
         top_text.tag_configure("center", justify='center')
         top_text.grid(row=0, column=0, rowspan=TOP_TEXT_ROWS, columnspan=5, sticky="sew")
 
-        center_text = tk.Text(root, font=(FONT_NAME, CENTER_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=CENTER_TEXT_HEIGHT, width=CENTER_TEXT_WIDTH, wrap="none", spacing1=24, spacing2=24)
+        center_text = tk.Text(root, font=(FONT_NAME, CENTER_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR,
+                              height=CENTER_TEXT_HEIGHT, width=CENTER_TEXT_WIDTH, wrap="none", spacing1=24, spacing2=24)
         center_text.grid(row=5, rowspan=CENTER_TEXT_ROWS, column=0, columnspan=5, sticky="nsew")
 
-        bottom_text = tk.Text(root, font=(FONT_NAME, BOTTOM_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=BOTTOM_TEXT_HEIGHT, width=BOTTOM_TEXT_WIDTH, wrap="word")
+        bottom_text = tk.Text(root, font=(FONT_NAME, BOTTOM_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR,
+                              height=BOTTOM_TEXT_HEIGHT, width=BOTTOM_TEXT_WIDTH, wrap="word")
         bottom_text.tag_configure("center", justify="center")
         bottom_text.grid(row=7, column=0, rowspan=BOTTOM_TEXT_ROWS, columnspan=5, sticky="new")
 
