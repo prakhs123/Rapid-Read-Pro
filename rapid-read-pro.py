@@ -342,7 +342,7 @@ def display_word(playback):
             # SYNC
             if word_index == num_words - 1:
                 while playback.playing:
-                    time.sleep(0.1)
+                    time.sleep(0.1 )
                 playback.stop()
                 audio_queue.get()
                 displaying.set(False)
@@ -351,9 +351,9 @@ def display_word(playback):
             next_display_id = root.after(word_time, display_word, playback)
             display_queue.put((word_index + 1, next_display_id,))
             # print(round(playback.curr_pos * 1000), (word_offset + word_time), round(playback.curr_pos * 1000) - (word_offset + word_time))
-            if playback and round(playback.curr_pos * 1000) - (word_offset + word_time) > 200:
+            if playback and round(playback.curr_pos * 1000) - (word_offset + word_time) > 700:
                 logging.info("SYNCING")
-                threading.Thread(target=pause_resume, args=(playback, 0.2), daemon=True).start()
+                threading.Thread(target=pause_resume, args=(playback, 0.7), daemon=True).start()
 
 
 def pause_resume(playback, t):
@@ -436,19 +436,27 @@ def generate_words(word_duration_tuple_list):
     return words_list, words_time_list, left_words_list, right_words_list, previous_words_list, forward_words_list
 
 
+def get_data_from_azure(file_path, ssml_string):
+    synthesizer = get_speech_synthesizer(file_path)
+    milliseconds_audio_duration, words_offset_duration = speak(synthesizer, ssml_string)
+    results_from_azure.append((milliseconds_audio_duration, words_offset_duration))
+
+
 def start_audio_and_display(index):
-    if playing.get() is True:
-        root.wait_variable(playing)
-    if displaying.get() is True:
-        root.wait_variable(displaying)
     ssml_string, total_tokens, start_token, end_token = ssml_strings[index]
     logging.info(f"Current Index: {index}")
     logging.info(f"Reading from start_token: {start_token}, end_token {end_token}")
 
     file_path = os.path.join(temp_dir, f'{generate_filename()}.mp3')
     logging.info(file_path)
-    synthesizer = get_speech_synthesizer(file_path)
-    milliseconds_audio_duration, words_offset_duration = speak(synthesizer, ssml_string)
+    get_data_from_azure_thread = threading.Thread(target=get_data_from_azure, args=(file_path, ssml_string), daemon=True)
+    get_data_from_azure_thread.start()
+    if playing.get() is True:
+        root.wait_variable(playing)
+    if displaying.get() is True:
+        root.wait_variable(displaying)
+    get_data_from_azure_thread.join()
+    milliseconds_audio_duration, words_offset_duration = results_from_azure.pop()
     global words_offset_duration_main
     words_offset_duration_main = words_offset_duration.copy()
     logging.info(
@@ -469,7 +477,7 @@ def start_audio_and_display(index):
             (word_index, len(words_list), word, word_time, left_words, right_words, previous_words, forward_words,
              words_offset_duration[word_index][1]))
 
-    next_id = root.after(milliseconds_audio_duration, start_audio_and_display, index + 1)
+    next_id = root.after(milliseconds_audio_duration-5000, start_audio_and_display, index + 1)
     execution_stack.put(next_id)
 
     playing.set(True)
@@ -619,6 +627,7 @@ if __name__ == '__main__':
     playing = tk.BooleanVar()
     displaying = tk.BooleanVar()
     words_offset_duration_main = []
+    results_from_azure = []
     with tempfile.TemporaryDirectory() as temp_dir:
         # create buttons with hotkeys
         play_button = tk.Button(root, text="Play", command=lambda: play_pause(None))
