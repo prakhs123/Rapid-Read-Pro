@@ -9,6 +9,7 @@ import time
 
 from just_playback import Playback
 import tkinter as tk
+from tkinter import ttk
 import wave
 import xml.etree.ElementTree as ET
 import xml.sax.saxutils
@@ -93,7 +94,7 @@ def create_ssml_string(text, doc_tag, emphasis_level):
     return f"""
         <{doc_tag}>
             <mstts:express-as style="narration-professional">
-                <prosody rate="+10.00%">
+                <prosody rate="+0.00%">
                     <emphasis level="{emphasis_level}">
                         {text}
                     </emphasis>
@@ -279,32 +280,40 @@ def display_word(playback):
     if displaying.get() is True:
         word_index, num_words, word, word_time, left_words, right_words, previous_words, forward_words, word_offset = curr_display_queue.get()
         if word_index < num_words:
+            if not line_queue1.empty():
+                id1, id2 = line_queue1.get()
+                top_line.delete(id1)
+                top_line.delete(id2)
+            if not line_queue2.empty():
+                id1, id2 = line_queue2.get()
+                bottom_line.delete(id1)
+                bottom_line.delete(id2)
             center_text.config(state=tk.NORMAL)
             center_text.delete("1.0", tk.END)
             highlight_index_word = switch(len(word))
-            diff = 50-highlight_index_word-1-len(left_words)-1
+            diff = (CENTER_TEXT_WIDTH*CENTER_TEXT_HEIGHT)//2-highlight_index_word-1-len(left_words)-1
             left_words_m = ' ' * diff + left_words + ' '
-            diff2 = 50-(len(word)-highlight_index_word-1+len(right_words)+1)
+            diff2 = (CENTER_TEXT_WIDTH*CENTER_TEXT_HEIGHT)//2-(len(word)-highlight_index_word-1+len(right_words)+1)
             right_words_m = ' ' + right_words + (' ' * diff2)
             full_text = left_words_m + word + right_words_m
             center_text.tag_add("left_words", "1.0", f"1.{len(left_words_m)-1}")
-            center_text.tag_config("left_words", justify="center")
+            center_text.tag_config("left_words")
             center_text.insert(tk.END, left_words_m, "left_words")
             center_text.tag_add("center_word", f"1.{len(left_words_m)}", f"1.{len(left_words_m)+len(word)-1}")
-            center_text.tag_config("center_word", justify="center", font=('Merriweather', 60))
+            center_text.tag_config("center_word", font=(FONT_NAME, WORD_FONT_SIZE))
             center_text.insert(tk.END, word, "center_word")
             center_text.tag_add("right_words", f"1.{len(left_words_m)+len(word)}", f"1.{len(left_words_m+word+right_words_m)}")
-            center_text.tag_config("right_words", justify="center")
+            center_text.tag_config("right_words")
             center_text.insert(tk.END, right_words_m, "right_words")
-            center_width = center_text.winfo_width()/2
-            x_pos = center_text.bbox('1.49')[0]
+            center_width = center_text.winfo_width()//2
+            x_pos = center_text.bbox(f'1.{CENTER_TEXT_WIDTH//2-1}')[0]
             center_text.tag_add('lmargin1', "1.0", "1.end")
             center_text.tag_config('lmargin1', lmargin1=center_width-x_pos)
-            center_text.tag_add("highlight", "1.49")
-            center_text.tag_config("highlight", foreground="#F57A10")
+            center_text.tag_add("highlight", f"1.{CENTER_TEXT_WIDTH//2-1}")
+            center_text.tag_config("highlight", foreground=HIGHLIGHT_COLOR)
             center_text.config(state=tk.DISABLED)
             if previous_words:
-                previous_words = '\n'*(13-(len(previous_words)//300)) + previous_words
+                previous_words = '\n'*(TOP_TEXT_ROWS-2-(len(previous_words)//(TOP_TEXT_HEIGHT*TOP_TEXT_WIDTH))) + previous_words
                 top_text.delete("1.0", tk.END)
                 top_text.insert(f"end", previous_words)
                 top_text.tag_add("center", "1.0", "end")
@@ -314,6 +323,14 @@ def display_word(playback):
                 bottom_text.insert("end", forward_words)
                 bottom_text.tag_add("center", "1.0", "end")
             _, _ = display_queue.get()
+            id1 = top_line.create_line(0, top_line.winfo_height()//2, center_text.winfo_width(), top_line.winfo_height()//2, width=top_line_width, fill=top_line_color)
+            x_pos = center_text.winfo_width() // 2
+            id2 = top_line.create_line(x_pos, top_line.winfo_height()//2, x_pos, top_line.winfo_height(), width=top_line_width, fill=top_line_color)
+            line_queue1.put((id1, id2))
+            id3 = bottom_line.create_line(0, bottom_line.winfo_height()//2, center_text.winfo_width(), bottom_line.winfo_height()//2, width=bottom_line_width, fill=bottom_line_color)
+            x_pos = center_text.winfo_width() // 2
+            id4 = bottom_line.create_line(x_pos, bottom_line.winfo_height()//2, x_pos, 0, width=bottom_line_width, fill=bottom_line_color)
+            line_queue2.put((id3, id4))
             # SYNC
             if word_index == num_words-1:
                 while playback.playing:
@@ -557,10 +574,22 @@ def skip(evt):
 if __name__ == '__main__':
     ssml_strings, start_index = initial_setup()
     root = tk.Tk()
+    BACKGROUND_COLOR = '#F7ECCF'
+    TEXT_COLOR = "#77614F"
+    HIGHLIGHT_COLOR = "#F57A10"
+    FONT_NAME = 'Merriweather'
+    TOP_FONT_SIZE = 24
+    BOTTOM_FONT_SIZE = 24
+    CENTER_FONT_SIZE = 48
+    WORD_FONT_SIZE = 60
+    SEPERATOR_LINE_WIDTH = 3
+    root.config(bg='#F7ECCF')
     audio_queue = Queue()
     display_queue = Queue()
     curr_display_queue = Queue()
     execution_stack = LifoQueue()
+    line_queue1 = LifoQueue()
+    line_queue2 = LifoQueue()
     playing = tk.BooleanVar()
     displaying = tk.BooleanVar()
     words_offset_duration_main = []
@@ -579,26 +608,49 @@ if __name__ == '__main__':
         skip_button = tk.Button(root, text="Skip", command=lambda: skip(None))
         root.bind("s", lambda event: skip(event))
 
-        play_button.grid(row=9, column=0, sticky="sew")
-        pause_button.grid(row=9, column=1, sticky="sew")
-        back_button.grid(row=9, column=2, sticky="sew")
-        restart_button.grid(row=9, column=3, sticky="sew")
-        skip_button.grid(row=9, column=4, sticky="sew")
+        play_button.grid(row=11, column=0, sticky="sew")
+        pause_button.grid(row=11, column=1, sticky="sew")
+        back_button.grid(row=11, column=2, sticky="sew")
+        restart_button.grid(row=11, column=3, sticky="sew")
+        skip_button.grid(row=11, column=4, sticky="sew")
 
-        top_text = tk.Text(root, font=('Merriweather', 24), bg='#F7ECCF', fg='#77614F', height=15, width=100, wrap="word")
+        TOP_TEXT_HEIGHT = 15
+        TOP_TEXT_WIDTH = 100
+        TOP_TEXT_ROWS = 4
+        top_text = tk.Text(root, font=(FONT_NAME, TOP_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=TOP_TEXT_HEIGHT, width=TOP_TEXT_WIDTH, wrap="word")
         top_text.tag_configure("center", justify='center')
-        top_text.grid(row=0, column=0, rowspan=4, columnspan=5, sticky="sew")
-        center_text = tk.Text(root, font=('Merriweather', 48), bg='#F7ECCF', fg='#77614F', height=1, width=100, wrap="none", spacing1=24, spacing2=24)
-        center_text.grid(row=4, rowspan=1, column=0, columnspan=5, sticky="nsew")
-        bottom_text = tk.Text(root, font=('Merriweather', 24), bg='#F7ECCF', fg='#77614F', height=15, width=100, wrap="word")
-        bottom_text.tag_configure("center", justify="center")
-        bottom_text.grid(row=5, column=0, rowspan=4, columnspan=5, sticky="new")
+        top_text.grid(row=0, column=0, rowspan=TOP_TEXT_ROWS, columnspan=5, sticky="sew")
 
-        for i in range(10):
+        CENTER_TEXT_HEIGHT = 1
+        CENTER_TEXT_WIDTH = 100
+        CENTER_TEXT_ROWS = 1
+        center_text = tk.Text(root, font=(FONT_NAME, CENTER_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=CENTER_TEXT_HEIGHT, width=CENTER_TEXT_WIDTH, wrap="none", spacing1=24, spacing2=24)
+        center_text.grid(row=5, rowspan=CENTER_TEXT_ROWS, column=0, columnspan=5, sticky="nsew")
+
+        BOTTOM_TEXT_HEIGHT = 15
+        BOTTOM_TEXT_WIDTH = 100
+        BOTTOM_TEXT_ROWS = 4
+        bottom_text = tk.Text(root, font=(FONT_NAME, BOTTOM_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=BOTTOM_TEXT_HEIGHT, width=BOTTOM_TEXT_WIDTH, wrap="word")
+        bottom_text.tag_configure("center", justify="center")
+        bottom_text.grid(row=7, column=0, rowspan=BOTTOM_TEXT_ROWS, columnspan=5, sticky="new")
+
+        top_line = tk.Canvas(root, height=1, bg=BACKGROUND_COLOR)
+        top_line.grid(row=4, column=0, columnspan=5, sticky="nsew")
+        top_line_color = TEXT_COLOR
+        top_line_width = SEPERATOR_LINE_WIDTH
+        bottom_line = tk.Canvas(root, height=1, bg=BACKGROUND_COLOR)
+        bottom_line.grid(row=6, column=0, columnspan=5, sticky="nsew")
+        bottom_line_color = TEXT_COLOR
+        bottom_line_width = SEPERATOR_LINE_WIDTH
+
+        for i in range(12):
             root.rowconfigure(i, weight=1)
+        root.rowconfigure(5, weight=2)
         for i in range(5):
             root.columnconfigure(i, weight=1)
         if start_index >= len(ssml_strings):
             sys.exit(0)
-        root.after(0, start_audio_and_display, start_index)
+
+        PLAY_BUTTON = tk.Button(root, command=lambda: start_audio_and_display(start_index))
+        root.bind('<Return>', lambda event: start_audio_and_display(start_index))
         root.mainloop()
