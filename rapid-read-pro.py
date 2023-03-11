@@ -93,7 +93,7 @@ def create_ssml_string(text, doc_tag, emphasis_level):
     return f"""
         <{doc_tag}>
             <mstts:express-as style="narration-professional">
-                <prosody rate="+40.00%">
+                <prosody rate="+10.00%">
                     <emphasis level="{emphasis_level}">
                         {text}
                     </emphasis>
