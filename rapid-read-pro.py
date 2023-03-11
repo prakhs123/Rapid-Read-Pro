@@ -91,8 +91,8 @@ def create_ssml_string(text, doc_tag, emphasis_level):
     text = text.replace('\n', ' ')
     return f"""
         <{doc_tag}>
-            <mstts:express-as style="narration-professional">
-                <prosody rate="+0.00%">
+            <mstts:express-as style="{STYLE}">
+                <prosody rate="{SPEED}">
                     <emphasis level="{emphasis_level}">
                         {text}
                     </emphasis>
@@ -116,8 +116,8 @@ def create_ssml_strings(contents, token_number, num_tokens):
         current_token_number_inside_index = 0
 
     ssml_strings = []
-    header = """<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
-        <voice name="en-US-AriaNeural">"""
+    header = f"""<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
+        <voice name="{VOICE}">"""
     footer = """
         </voice>
     </speak>"""
@@ -570,8 +570,10 @@ def skip(evt):
 
 
 if __name__ == '__main__':
-    ssml_strings, start_index = initial_setup()
-    root = tk.Tk()
+
+    SPEED = "+0.00%"
+    VOICE = "en-US-AriaNeural"
+    STYLE = "narration-professional"
     BACKGROUND_COLOR = '#F7ECCF'
     TEXT_COLOR = "#77614F"
     HIGHLIGHT_COLOR = "#F57A10"
@@ -579,7 +581,7 @@ if __name__ == '__main__':
     TOP_FONT_SIZE = 24
     BOTTOM_FONT_SIZE = 24
     CENTER_FONT_SIZE = 48
-    WORD_FONT_SIZE = 60
+    WORD_FONT_SIZE = 72
     SEPERATOR_LINE_WIDTH = 3
     TOP_TEXT_HEIGHT = 15
     TOP_TEXT_WIDTH = 100
@@ -590,7 +592,9 @@ if __name__ == '__main__':
     BOTTOM_TEXT_HEIGHT = 15
     BOTTOM_TEXT_WIDTH = 100
     BOTTOM_TEXT_ROWS = 4
-    root.config(bg='#F7ECCF')
+    ssml_strings, start_index = initial_setup()
+    root = tk.Tk()
+    root.config(bg=BACKGROUND_COLOR)
     audio_queue = Queue()
     display_queue = Queue()
     curr_display_queue = Queue()
