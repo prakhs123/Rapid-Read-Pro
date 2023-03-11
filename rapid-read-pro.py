@@ -93,7 +93,7 @@ def create_ssml_string(text, doc_tag, emphasis_level):
     return f"""
         <{doc_tag}>
             <mstts:express-as style="narration-professional">
-                <prosody rate="+40.00%">
+                <prosody rate="+10.00%">
                     <emphasis level="{emphasis_level}">
                         {text}
                     </emphasis>
@@ -279,26 +279,32 @@ def display_word(playback):
     if displaying.get() is True:
         word_index, num_words, word, word_time, left_words, right_words, previous_words, forward_words, word_offset = curr_display_queue.get()
         if word_index < num_words:
+            center_text.config(state=tk.NORMAL)
             center_text.delete("1.0", tk.END)
-            highlight_index = switch(len(word))
-            center_text.tag_config("left", font=('Merriweather', 36))
-            center_text.tag_config("word", font=('Merriweather', 60))
-            center_text.tag_config("right", font=('Merriweather', 36))
-            center_text.insert("end", left_words, "left")
-            center_text.insert("end", " ")
-            center_text.insert("end", word, "word")
-            center_text.insert("end", " ")
-            center_text.insert("end", right_words, "right")
-            center_tag = "center"
-            center_text.tag_configure(center_tag, justify="center")
-            center_text.tag_add("center", "1.0", "end")
-            s_index = center_text.search(word, "1.0", "end")
-            e_index = f"{s_index}+{len(word)}c"
-            center_text.tag_add(center_tag, s_index, e_index)
+            highlight_index_word = switch(len(word))
+            diff = 50-highlight_index_word-1-len(left_words)-1
+            left_words_m = ' ' * diff + left_words + ' '
+            diff2 = 50-(len(word)-highlight_index_word-1+len(right_words)+1)
+            right_words_m = ' ' + right_words + (' ' * diff2)
+            full_text = left_words_m + word + right_words_m
+            center_text.tag_add("left_words", "1.0", f"1.{len(left_words_m)-1}")
+            center_text.tag_config("left_words", justify="center")
+            center_text.insert(tk.END, left_words_m, "left_words")
+            center_text.tag_add("center_word", f"1.{len(left_words_m)}", f"1.{len(left_words_m)+len(word)-1}")
+            center_text.tag_config("center_word", justify="center", font=('Merriweather', 60))
+            center_text.insert(tk.END, word, "center_word")
+            center_text.tag_add("right_words", f"1.{len(left_words_m)+len(word)}", f"1.{len(left_words_m+word+right_words_m)}")
+            center_text.tag_config("right_words", justify="center")
+            center_text.insert(tk.END, right_words_m, "right_words")
+            center_width = center_text.winfo_width()/2
+            x_pos = center_text.bbox('1.49')[0]
+            center_text.tag_add('lmargin1', "1.0", "1.end")
+            center_text.tag_config('lmargin1', lmargin1=center_width-x_pos)
+            center_text.tag_add("highlight", "1.49")
             center_text.tag_config("highlight", foreground="#F57A10")
-            center_text.tag_add("highlight", f"1.{len(left_words) + 1 + highlight_index + 1}")
+            center_text.config(state=tk.DISABLED)
             if previous_words:
-                previous_words = '\n'*(18-(len(previous_words)//200)) + previous_words
+                previous_words = '\n'*(13-(len(previous_words)//300)) + previous_words
                 top_text.delete("1.0", tk.END)
                 top_text.insert(f"end", previous_words)
                 top_text.tag_add("center", "1.0", "end")
@@ -319,7 +325,7 @@ def display_word(playback):
                 return
             next_display_id = root.after(word_time, display_word, playback)
             display_queue.put((word_index+1, next_display_id,))
-            if round(playback.curr_pos * 1000) - (word_offset + word_time) > 625:
+            if playback and round(playback.curr_pos * 1000) - (word_offset + word_time) > 625:
                 logging.debug(f"SYNCING {((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000)}")
                 playback.pause()
                 time.sleep(((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000))
@@ -440,6 +446,7 @@ def start_audio_and_display(index):
     # stream, p, wf = play_with_pyaudio(file_path)
     playback = play_with_playback(file_path)
     playback.play()
+    # playback = None
     next_display_id = root.after(0, display_word, playback)
     audio_queue.put((playback, index,))
     display_queue.put((0, next_display_id,))
@@ -578,12 +585,12 @@ if __name__ == '__main__':
         restart_button.grid(row=9, column=3, sticky="sew")
         skip_button.grid(row=9, column=4, sticky="sew")
 
-        top_text = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=20, width=50, wrap="word")
+        top_text = tk.Text(root, font=('Merriweather', 24), bg='#F7ECCF', fg='#77614F', height=15, width=100, wrap="word")
         top_text.tag_configure("center", justify='center')
         top_text.grid(row=0, column=0, rowspan=4, columnspan=5, sticky="sew")
-        center_text = tk.Text(root, font=('Merriweather', 60), bg='#F7ECCF', fg='#77614F', height=1, width=50)
-        center_text.grid(row=4, rowspan=1, column=0, columnspan=5, sticky="ew")
-        bottom_text = tk.Text(root, font=('Merriweather', 18), bg='#F7ECCF', fg='#77614F', height=20, width=50, wrap="word")
+        center_text = tk.Text(root, font=('Merriweather', 48), bg='#F7ECCF', fg='#77614F', height=1, width=100, wrap="none", spacing1=24, spacing2=24)
+        center_text.grid(row=4, rowspan=1, column=0, columnspan=5, sticky="nsew")
+        bottom_text = tk.Text(root, font=('Merriweather', 24), bg='#F7ECCF', fg='#77614F', height=15, width=100, wrap="word")
         bottom_text.tag_configure("center", justify="center")
         bottom_text.grid(row=5, column=0, rowspan=4, columnspan=5, sticky="new")
 
