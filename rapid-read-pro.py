@@ -6,10 +6,7 @@ import string
 import sys
 import tempfile
 import time
-
-from just_playback import Playback
 import tkinter as tk
-from tkinter import ttk
 import wave
 import xml.etree.ElementTree as ET
 import xml.sax.saxutils
@@ -20,6 +17,7 @@ import azure.cognitiveservices.speech as speechsdk
 import pyaudio
 from bs4 import BeautifulSoup
 from ebooklib import epub
+from just_playback import Playback
 from requests_html import HTMLSession
 
 # configure logging
