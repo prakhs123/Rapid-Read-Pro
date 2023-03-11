@@ -5,6 +5,7 @@ import random
 import string
 import sys
 import tempfile
+import threading
 import time
 import tkinter as tk
 import wave
@@ -37,7 +38,7 @@ def speech_synthesis_get_available_voices(text):
     """gets the available voices list."""
     speech_config = speechsdk.SpeechConfig(subscription=os.environ.get('SPEECH_KEY'),
                                            region=os.environ.get('SPEECH_REGION'))
-    speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Riff48Khz16BitMonoPcm)
+    speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Audio48Khz192KBitRateMonoMp3)
     audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
     speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
     result = speech_synthesizer.get_voices_async(text).get()
@@ -82,7 +83,7 @@ def get_speech_synthesizer(file_path):
     # This example requires environment variables named "SPEECH_KEY" and "SPEECH_REGION"
     speech_config = speechsdk.SpeechConfig(subscription=os.environ.get('SPEECH_KEY'),
                                            region=os.environ.get('SPEECH_REGION'))
-    speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Riff48Khz16BitMonoPcm)
+    speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Audio16Khz128KBitRateMonoMp3)
     audio_config = speechsdk.audio.AudioOutputConfig(filename=file_path)
     return speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
 
@@ -349,11 +350,16 @@ def display_word(playback):
                 return
             next_display_id = root.after(word_time, display_word, playback)
             display_queue.put((word_index + 1, next_display_id,))
-            if playback and round(playback.curr_pos * 1000) - (word_offset + word_time) > 625:
-                logging.debug(f"SYNCING {((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000)}")
-                playback.pause()
-                time.sleep(((round(playback.curr_pos * 1000) - (word_offset + word_time)) // 1000))
-                playback.resume()
+            # print(round(playback.curr_pos * 1000), (word_offset + word_time), round(playback.curr_pos * 1000) - (word_offset + word_time))
+            if playback and round(playback.curr_pos * 1000) - (word_offset + word_time) > 200:
+                logging.info("SYNCING")
+                threading.Thread(target=pause_resume, args=(playback, 0.2), daemon=True).start()
+
+
+def pause_resume(playback, t):
+    playback.pause()
+    time.sleep(t)
+    playback.resume()
 
 
 def play_with_pyaudio(file_path):
@@ -439,7 +445,7 @@ def start_audio_and_display(index):
     logging.info(f"Current Index: {index}")
     logging.info(f"Reading from start_token: {start_token}, end_token {end_token}")
 
-    file_path = os.path.join(temp_dir, f'{generate_filename()}.wav')
+    file_path = os.path.join(temp_dir, f'{generate_filename()}.mp3')
     logging.info(file_path)
     synthesizer = get_speech_synthesizer(file_path)
     milliseconds_audio_duration, words_offset_duration = speak(synthesizer, ssml_string)
