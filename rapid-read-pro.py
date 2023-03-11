@@ -312,15 +312,16 @@ def display_word(playback):
             center_text.tag_add("highlight", f"1.{CENTER_TEXT_WIDTH // 2 - 1}")
             center_text.tag_config("highlight", foreground=HIGHLIGHT_COLOR)
             center_text.config(state=tk.DISABLED)
+            top_text.delete("1.0", tk.END)
             if previous_words:
                 previous_words = '\n' * (TOP_TEXT_ROWS - 2 - (
-                            len(previous_words) // (TOP_TEXT_HEIGHT * TOP_TEXT_WIDTH))) + previous_words
-                top_text.delete("1.0", tk.END)
+                            len(previous_words) // ((TOP_TEXT_ROWS-1) * TOP_TEXT_WIDTH))) + previous_words
                 top_text.insert(f"end", previous_words)
                 top_text.tag_add("center", "1.0", "end")
+            bottom_text.delete("1.0", tk.END)
             if forward_words:
                 forward_words = '\n' + forward_words
-                bottom_text.delete("1.0", tk.END)
+
                 bottom_text.insert("end", forward_words)
                 bottom_text.tag_add("center", "1.0", "end")
             _, _ = display_queue.get()
@@ -579,8 +580,7 @@ def skip(evt):
 
 
 if __name__ == '__main__':
-
-    SPEED = "+0.00%"
+    SPEED = "+20.00%"
     VOICE = "en-US-AriaNeural"
     STYLE = "narration-professional"
     BACKGROUND_COLOR = '#F7ECCF'
