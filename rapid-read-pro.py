@@ -583,6 +583,15 @@ if __name__ == '__main__':
     CENTER_FONT_SIZE = 48
     WORD_FONT_SIZE = 60
     SEPERATOR_LINE_WIDTH = 3
+    TOP_TEXT_HEIGHT = 15
+    TOP_TEXT_WIDTH = 100
+    TOP_TEXT_ROWS = 4
+    CENTER_TEXT_HEIGHT = 1
+    CENTER_TEXT_WIDTH = 100
+    CENTER_TEXT_ROWS = 1
+    BOTTOM_TEXT_HEIGHT = 15
+    BOTTOM_TEXT_WIDTH = 100
+    BOTTOM_TEXT_ROWS = 4
     root.config(bg='#F7ECCF')
     audio_queue = Queue()
     display_queue = Queue()
@@ -614,22 +623,13 @@ if __name__ == '__main__':
         restart_button.grid(row=11, column=3, sticky="sew")
         skip_button.grid(row=11, column=4, sticky="sew")
 
-        TOP_TEXT_HEIGHT = 15
-        TOP_TEXT_WIDTH = 100
-        TOP_TEXT_ROWS = 4
         top_text = tk.Text(root, font=(FONT_NAME, TOP_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=TOP_TEXT_HEIGHT, width=TOP_TEXT_WIDTH, wrap="word")
         top_text.tag_configure("center", justify='center')
         top_text.grid(row=0, column=0, rowspan=TOP_TEXT_ROWS, columnspan=5, sticky="sew")
 
-        CENTER_TEXT_HEIGHT = 1
-        CENTER_TEXT_WIDTH = 100
-        CENTER_TEXT_ROWS = 1
         center_text = tk.Text(root, font=(FONT_NAME, CENTER_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=CENTER_TEXT_HEIGHT, width=CENTER_TEXT_WIDTH, wrap="none", spacing1=24, spacing2=24)
         center_text.grid(row=5, rowspan=CENTER_TEXT_ROWS, column=0, columnspan=5, sticky="nsew")
 
-        BOTTOM_TEXT_HEIGHT = 15
-        BOTTOM_TEXT_WIDTH = 100
-        BOTTOM_TEXT_ROWS = 4
         bottom_text = tk.Text(root, font=(FONT_NAME, BOTTOM_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR, height=BOTTOM_TEXT_HEIGHT, width=BOTTOM_TEXT_WIDTH, wrap="word")
         bottom_text.tag_configure("center", justify="center")
         bottom_text.grid(row=7, column=0, rowspan=BOTTOM_TEXT_ROWS, columnspan=5, sticky="new")
