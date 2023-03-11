@@ -314,7 +314,7 @@ def display_word(playback):
             center_text.config(state=tk.DISABLED)
             top_text.delete("1.0", tk.END)
             if previous_words:
-                previous_words = '\n' * (TOP_TEXT_ROWS - 2 - (
+                previous_words = '\n' * ((TOP_TEXT_HEIGHT - 2) - (
                             len(previous_words) // ((TOP_TEXT_ROWS-1) * TOP_TEXT_WIDTH))) + previous_words
                 top_text.insert(f"end", previous_words)
                 top_text.tag_add("center", "1.0", "end")
@@ -586,11 +586,11 @@ if __name__ == '__main__':
     BACKGROUND_COLOR = '#F7ECCF'
     TEXT_COLOR = "#77614F"
     HIGHLIGHT_COLOR = "#F57A10"
-    FONT_NAME = 'Merriweather'
+    FONT_NAME = 'Verdana'
     TOP_FONT_SIZE = 24
     BOTTOM_FONT_SIZE = 24
-    CENTER_FONT_SIZE = 48
-    WORD_FONT_SIZE = 72
+    CENTER_FONT_SIZE = 36
+    WORD_FONT_SIZE = 60
     SEPERATOR_LINE_WIDTH = 3
     TOP_TEXT_HEIGHT = 15
     TOP_TEXT_WIDTH = 100
