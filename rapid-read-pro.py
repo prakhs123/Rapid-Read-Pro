@@ -29,8 +29,9 @@ SPEECH_REGION = os.environ.get('SPEECH_REGION') if os.environ.get('SPEECH_REGION
 
 def speech_synthesis_get_available_voices(text):
     """gets the available voices list."""
-    speech_config = speechsdk.SpeechConfig(subscription=os.environ.get('SPEECH_KEY'),
-                                           region=os.environ.get('SPEECH_REGION'))
+    global SPEECH_KEY, SPEECH_REGION
+    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY,
+                                           region=SPEECH_REGION)
     speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Audio48Khz192KBitRateMonoMp3)
     audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
     speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
@@ -74,8 +75,9 @@ def extract_emphasis_text(xml_string):
 
 def get_speech_synthesizer(file_path):
     # This example requires environment variables named "SPEECH_KEY" and "SPEECH_REGION"
-    speech_config = speechsdk.SpeechConfig(subscription=os.environ.get('SPEECH_KEY'),
-                                           region=os.environ.get('SPEECH_REGION'))
+    global SPEECH_KEY, SPEECH_REGION
+    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY,
+                                           region=SPEECH_REGION)
     speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Audio16Khz128KBitRateMonoMp3)
     audio_config = speechsdk.audio.AudioOutputConfig(filename=file_path)
     return speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
