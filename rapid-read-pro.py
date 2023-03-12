@@ -144,7 +144,7 @@ def create_ssml_strings(contents, token_number, num_tokens, is_pdf=False):
             if len(text.split()) < 1:
                 continue
         else:
-            text = content
+            text = xml.sax.saxutils.escape(content)
             doc_tag = "p"
             emphasis_level = "none"
         token_string = create_ssml_string(text, doc_tag, emphasis_level)
