@@ -22,7 +22,7 @@ Remove ads and side contents from HTML pages
 ## Requirements
 * Python 3.x
 * Azure Cognitive Services Speech SDK
-* PyAudio
+* just_playback
 * Tkinter
 * Other necessary Python modules (as listed in requirements.txt)
 
@@ -54,6 +54,8 @@ export SPEECH_REGION=<your_subscription_region>
 
 ```commandline
 pyinstaller rapid-read-pro.py --paths "v1/lib/python3.11/site-packages" --add-binary "v1/lib/python3.11/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "v1/lib/python3.11/site-packages/cffi:cffi" --hidden-import=_cffi_backend
+
+pyinstaller rapid-read-pro.py --paths "v1\Lib\site-packages" --add-binary "v1\Lib\site-packages\azure\cognitiveservices\speech\Microsoft.CognitiveServices.Speech.core.dll;." --add-data "v1\Lib\site-packages\cffi;cffi" --hidden-import=_cffi_backend
 ```
 
 ## Acknowledgements
