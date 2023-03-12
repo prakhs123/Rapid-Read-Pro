@@ -8,14 +8,12 @@ import tempfile
 import threading
 import time
 import tkinter as tk
-import wave
 import xml.etree.ElementTree as ET
 import xml.sax.saxutils
 from datetime import timedelta
 from queue import Queue, LifoQueue
 
 import azure.cognitiveservices.speech as speechsdk
-import pyaudio
 from bs4 import BeautifulSoup
 from ebooklib import epub
 from just_playback import Playback
@@ -26,12 +24,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 SPEECH_KEY = os.environ.get('SPEECH_KEY')
 SPEECH_REGION = os.environ.get('SPEECH_REGION')
-
-if not SPEECH_KEY:
-    raise ValueError("SPEECH_KEY is not set.")
-
-if not SPEECH_REGION:
-    raise ValueError("SPEECH_REGION is not set.")
 
 
 def speech_synthesis_get_available_voices(text):
@@ -207,30 +199,26 @@ def parse_args():
 
 
 def initial_setup():
-    args = parse_args()
-    locale = args.get_available_voices
-    if locale:
-        speech_synthesis_get_available_voices(locale)
-        sys.exit(0)
-    item_page = args.item_page
-    num_tokens = args.num_tokens
+    global EPUB_OR_HTML_FILE, NUM_TOKENS, ITEM_PAGE, START_INDEX
+    ITEM_PAGE = int(ITEM_PAGE)
+    NUM_TOKENS = int(NUM_TOKENS)
+    START_INDEX = int(START_INDEX)
     try:
-        if args.epub_or_html_file.endswith('.epub'):
-            book = epub.read_epub(args.epub_or_html_file)
+        if EPUB_OR_HTML_FILE.endswith('.epub'):
+            book = epub.read_epub(EPUB_OR_HTML_FILE)
             items = [item for item in book.get_items() if item.get_type() == 9]
             for pg_no, item in enumerate(items):
                 logging.info(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}")
-            if item_page is None:
-                item_page = int(input("Enter Item Page to read"))
+            item_page = ITEM_PAGE
             item = items[item_page]
             html = item.get_content()
-        elif args.epub_or_html_file.startswith('http'):
+        elif EPUB_OR_HTML_FILE.startswith('http'):
             session = HTMLSession()
-            r = session.get(args.epub_or_html_file)
+            r = session.get(EPUB_OR_HTML_FILE)
             html = r.text
             session.close()
-        elif args.epub_or_html_file.endswith('.html'):
-            with open(args.epub_or_html_file, 'r') as file:
+        elif EPUB_OR_HTML_FILE.endswith('.html'):
+            with open(EPUB_OR_HTML_FILE, 'r') as file:
                 html = file.read()
         else:
             raise Exception('File Not Supported')
@@ -239,20 +227,17 @@ def initial_setup():
         return
     soup = BeautifulSoup(html, 'html.parser')
     contents = []
-    if args.epub_or_html_file.startswith('http'):
+    if EPUB_OR_HTML_FILE.startswith('http'):
         if soup.article:
             contents = soup.article.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
         elif soup.section:
             contents = soup.section.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
     else:
         contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd'])
-    ssml_strings = create_ssml_strings(contents, 0, num_tokens)
+    ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS)
     for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ssml_strings):
         logging.info(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
-    if args.start_index is None:
-        si = int(input("Enter start index to read"))
-    else:
-        si = args.start_index
+    si = START_INDEX
     return ssml_strings, si
 
 
@@ -316,7 +301,7 @@ def display_word(playback):
             top_text.delete("1.0", tk.END)
             if previous_words:
                 previous_words = '\n' * ((TOP_TEXT_HEIGHT - 2) - (
-                            len(previous_words) // ((TOP_TEXT_ROWS-1) * TOP_TEXT_WIDTH))) + previous_words
+                            round(len(previous_words) / ((TOP_TEXT_ROWS-1) * TOP_TEXT_WIDTH)))) + previous_words
                 top_text.insert(f"end", previous_words)
                 top_text.tag_add("center", "1.0", "end")
             bottom_text.delete("1.0", tk.END)
@@ -342,7 +327,7 @@ def display_word(playback):
             # SYNC
             if word_index == num_words - 1:
                 while playback.playing:
-                    time.sleep(0.1 )
+                    time.sleep(0.1)
                 playback.stop()
                 audio_queue.get()
                 displaying.set(False)
@@ -350,7 +335,6 @@ def display_word(playback):
                 return
             next_display_id = root.after(word_time, display_word, playback)
             display_queue.put((word_index + 1, next_display_id,))
-            # print(round(playback.curr_pos * 1000), (word_offset + word_time), round(playback.curr_pos * 1000) - (word_offset + word_time))
             if playback and round(playback.curr_pos * 1000) - (word_offset + word_time) > 700:
                 logging.info("SYNCING")
                 threading.Thread(target=pause_resume, args=(playback, 0.7), daemon=True).start()
@@ -360,31 +344,6 @@ def pause_resume(playback, t):
     playback.pause()
     time.sleep(t)
     playback.resume()
-
-
-def play_with_pyaudio(file_path):
-    wf = wave.open(file_path, 'rb')
-
-    # Define callback for playback (1)
-    def callback(in_data, frame_count, time_info, status):
-        data = wf.readframes(frame_count)
-        # If len(data) is less than requested frame_count, PyAudio automatically
-        # assumes the stream is finished, and the stream stops.
-        if status in [pyaudio.paComplete, pyaudio.paAbort] or len(data) < frame_count:
-            playing.set(False)
-            audio_queue.get()
-
-        return data, pyaudio.paContinue
-
-    # Instantiate PyAudio and initialize PortAudio system resources (2)
-    p = pyaudio.PyAudio()
-    # Open stream using callback (3)
-    stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
-                    channels=wf.getnchannels(),
-                    rate=wf.getframerate(),
-                    output=True,
-                    stream_callback=callback)
-    return stream, p, wf
 
 
 def play_with_playback(file_path):
@@ -407,19 +366,19 @@ def generate_words(word_duration_tuple_list):
     words_list = []
     words_time_list = []
     for word_index in range(len(word_duration_tuple_list)):
-        if word_index - 5 >= 0:
-            left_words = [wd[0] for wd in word_duration_tuple_list[word_index - 5:word_index]]
+        if word_index - NUM_WORDS_IN_CENTER_TEXT >= 0:
+            left_words = [wd[0] for wd in word_duration_tuple_list[word_index - NUM_WORDS_IN_CENTER_TEXT:word_index]]
             left_words = ' '.join(left_words)
-            previous_words = [wd[0] for wd in word_duration_tuple_list[:word_index - 5]]
+            previous_words = [wd[0] for wd in word_duration_tuple_list[:word_index - NUM_WORDS_IN_CENTER_TEXT]]
             previous_words = ' '.join(previous_words)
         else:
             left_words = [wd[0] for wd in word_duration_tuple_list[0:word_index]]
             left_words = ' '.join(left_words)
             previous_words = None
-        if word_index + 5 < len(word_duration_tuple_list):
-            right_words = [wd[0] for wd in word_duration_tuple_list[word_index + 1:word_index + 5]]
+        if word_index + NUM_WORDS_IN_CENTER_TEXT < len(word_duration_tuple_list):
+            right_words = [wd[0] for wd in word_duration_tuple_list[word_index + 1:word_index + NUM_WORDS_IN_CENTER_TEXT]]
             right_words = ' '.join(right_words)
-            forward_words = [wd[0] for wd in word_duration_tuple_list[word_index + 5:]]
+            forward_words = [wd[0] for wd in word_duration_tuple_list[word_index + NUM_WORDS_IN_CENTER_TEXT:]]
             forward_words = ' '.join(forward_words)
         else:
             right_words = [wd[0] for wd in word_duration_tuple_list[word_index + 1:len(word_duration_tuple_list)]]
@@ -593,7 +552,195 @@ def skip(evt):
     execution_stack.put(next_id)
 
 
+def on_window_resize(event):
+    global TOP_FONT_SIZE, BOTTOM_FONT_SIZE, CENTER_FONT_SIZE, WORD_FONT_SIZE, SEPERATOR_LINE_WIDTH, TOP_TEXT_HEIGHT, \
+        TOP_TEXT_WIDTH, CENTER_TEXT_WIDTH, BOTTOM_TEXT_HEIGHT, BOTTOM_TEXT_WIDTH, SPACING_TOP_CENTER_TEXT, \
+        SPACING_BOTTOM_CENTER_TEXT, NUM_WORDS_IN_CENTER_TEXT
+    # Calculate the new values of the constants based on the window size
+    window_height = root.winfo_height()
+    window_width = root.winfo_width()
+
+    TOP_FONT_SIZE = round(24 * window_height / 1412)
+    BOTTOM_FONT_SIZE = round(24 * window_height / 1412)
+    CENTER_FONT_SIZE = round(36 * window_height / 1412)
+    WORD_FONT_SIZE = round(60 * window_height / 1412)
+    SEPERATOR_LINE_WIDTH = round(3 * window_height / 1412)
+    TOP_TEXT_HEIGHT = round(15 * window_height / 1412)
+    TOP_TEXT_WIDTH = round(100 * window_width / 2529)
+    CENTER_TEXT_WIDTH = round(100 * window_width / 2529)
+    BOTTOM_TEXT_HEIGHT = round(15 * window_height / 1412)
+    BOTTOM_TEXT_WIDTH = round(100 * window_width / 2529)
+    SPACING_TOP_CENTER_TEXT = round(24 * window_height / 1412)
+    SPACING_BOTTOM_CENTER_TEXT = round(24 * window_height / 1412)
+    NUM_WORDS_IN_CENTER_TEXT = round(5 * window_width / 2529)
+
+    # Set the new values of the constants in the widgets
+    top_text.configure(font=(FONT_NAME, TOP_FONT_SIZE),
+                        height=TOP_TEXT_HEIGHT,
+                        width=TOP_TEXT_WIDTH)
+    center_text.configure(font=(FONT_NAME, CENTER_FONT_SIZE),
+                           height=CENTER_TEXT_HEIGHT,
+                           width=CENTER_TEXT_WIDTH,
+                           spacing1=SPACING_TOP_CENTER_TEXT,
+                           spacing2=SPACING_BOTTOM_CENTER_TEXT)
+    bottom_text.configure(font=(FONT_NAME, BOTTOM_FONT_SIZE),
+                           height=BOTTOM_TEXT_HEIGHT,
+                           width=BOTTOM_TEXT_WIDTH)
+
+
+def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, bg_color_entry, bg_color_label, text_color_entry, text_color_label, highlight_color_entry, highlight_color_label, font_name_entry, font_name_label, file_entry, file_label, num_tokens_entry, num_tokens_label, item_page_entry, item_page_label, start_index_entry, start_index_label,  speech_key_label, speech_key_entry, speech_region_label, speech_region_entry, update_button):
+    global SPEED, VOICE, STYLE, BACKGROUND_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, FONT_NAME, EPUB_OR_HTML_FILE, \
+        NUM_TOKENS, ITEM_PAGE, START_INDEX, SPEECH_KEY, SPEECH_REGION
+    SPEED = speed_entry.get()
+    VOICE = voice_entry.get()
+    STYLE = style_entry.get()
+    BACKGROUND_COLOR = bg_color_entry.get()
+    TEXT_COLOR = text_color_entry.get()
+    HIGHLIGHT_COLOR = highlight_color_entry.get()
+    FONT_NAME = font_name_entry.get()
+    EPUB_OR_HTML_FILE = file_entry.get()
+    NUM_TOKENS = num_tokens_entry.get()
+    ITEM_PAGE = item_page_entry.get()
+    START_INDEX = start_index_entry.get()
+    SPEECH_KEY = speech_key_entry.get()
+    SPEECH_REGION = speech_region_entry.get()
+    speed_entry.destroy()
+    speed_label.destroy()
+    voice_entry.destroy()
+    voice_label.destroy()
+    style_entry.destroy()
+    style_label.destroy()
+    bg_color_entry.destroy()
+    bg_color_label.destroy()
+    text_color_entry.destroy()
+    text_color_label.destroy()
+    highlight_color_entry.destroy()
+    highlight_color_label.destroy()
+    font_name_entry.destroy()
+    font_name_label.destroy()
+    file_entry.destroy()
+    file_label.destroy()
+    num_tokens_entry.destroy()
+    num_tokens_label.destroy()
+    item_page_entry.destroy()
+    item_page_label.destroy()
+    start_index_entry.destroy()
+    start_index_label.destroy()
+    speech_key_entry.destroy()
+    speech_key_label.destroy()
+    speech_region_entry.destroy()
+    speech_region_label.destroy()
+    update_button.destroy()
+
+
+def take_inputs():
+    global SPEED, VOICE, STYLE, BACKGROUND_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, FONT_NAME, EPUB_OR_HTML_FILE, \
+        NUM_TOKENS, ITEM_PAGE, START_INDEX
+    # Create input fields for each default value
+    speed_label = tk.Label(root, text="Speed")
+    speed_entry = tk.Entry(root)
+    speed_entry.insert(0, SPEED)
+
+    voice_label = tk.Label(root, text="Voice")
+    voice_entry = tk.Entry(root)
+    voice_entry.insert(0, VOICE)
+
+    style_label = tk.Label(root, text="Style")
+    style_entry = tk.Entry(root)
+    style_entry.insert(0, STYLE)
+
+    bg_color_label = tk.Label(root, text="Background Color")
+    bg_color_entry = tk.Entry(root)
+    bg_color_entry.insert(0, BACKGROUND_COLOR)
+
+    text_color_label = tk.Label(root, text="Text Color")
+    text_color_entry = tk.Entry(root)
+    text_color_entry.insert(0, TEXT_COLOR)
+
+    highlight_color_label = tk.Label(root, text="Highlight Color")
+    highlight_color_entry = tk.Entry(root)
+    highlight_color_entry.insert(0, HIGHLIGHT_COLOR)
+
+    font_name_label = tk.Label(root, text="Font Name")
+    font_name_entry = tk.Entry(root)
+    font_name_entry.insert(0, FONT_NAME)
+
+    file_label = tk.Label(root, text="Epub or HTML file")
+    file_entry = tk.Entry(root)
+    file_entry.insert(0, EPUB_OR_HTML_FILE)
+
+    num_tokens_label = tk.Label(root, text="Number of Tokens")
+    num_tokens_entry = tk.Entry(root)
+    num_tokens_entry.insert(0, str(NUM_TOKENS))
+
+    item_page_label = tk.Label(root, text="Item Page")
+    item_page_entry = tk.Entry(root)
+    item_page_entry.insert(0, str(ITEM_PAGE))
+
+    start_index_label = tk.Label(root, text="Start Index")
+    start_index_entry = tk.Entry(root)
+    start_index_entry.insert(0, str(START_INDEX))
+
+    speech_key_label = tk.Label(root, text="SPEECH_KEY")
+    speech_key_entry = tk.Entry(root)
+    speech_key_entry.insert(0, SPEECH_KEY)
+
+    speech_region_label = tk.Label(root, text="SPEECH_REGION")
+    speech_region_entry = tk.Entry(root)
+    speech_region_entry.insert(0, SPEECH_REGION)
+
+    update_button = tk.Button(root, text="Update Values", command=lambda: get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, bg_color_entry, bg_color_label, text_color_entry, text_color_label, highlight_color_entry, highlight_color_label, font_name_entry, font_name_label, file_entry, file_label, num_tokens_entry, num_tokens_label, item_page_entry, item_page_label, start_index_entry, start_index_label, speech_key_label, speech_key_entry, speech_region_label, speech_region_entry, update_button))
+
+    # Place input fields on window using grid layout
+    speed_label.grid(row=0, column=0)
+    speed_entry.grid(row=0, column=1)
+
+    voice_label.grid(row=1, column=0)
+    voice_entry.grid(row=1, column=1)
+
+    style_label.grid(row=2, column=0)
+    style_entry.grid(row=2, column=1)
+
+    bg_color_label.grid(row=3, column=0)
+    bg_color_entry.grid(row=3, column=1)
+
+    text_color_label.grid(row=4, column=0)
+    text_color_entry.grid(row=4, column=1)
+
+    highlight_color_label.grid(row=5, column=0)
+    highlight_color_entry.grid(row=5, column=1)
+
+    font_name_label.grid(row=6, column=0)
+    font_name_entry.grid(row=6, column=1)
+
+    file_label.grid(row=7, column=0)
+    file_entry.grid(row=7, column=1)
+
+    num_tokens_label.grid(row=8, column=0)
+    num_tokens_entry.grid(row=8, column=1)
+
+    item_page_label.grid(row=9, column=0)
+    item_page_entry.grid(row=9, column=1)
+
+    start_index_label.grid(row=10, column=0)
+    start_index_entry.grid(row=10, column=1)
+
+    speech_key_label.grid(row=11, column=0)
+    speech_key_entry.grid(row=11, column=1)
+
+    speech_region_label.grid(row=12, column=0)
+    speech_region_entry.grid(row=12, column=1)
+
+    update_button.grid(row=13, column=1)
+    # Set Values
+    root.wait_window(update_button)
+
+
 if __name__ == '__main__':
+    EPUB_OR_HTML_FILE = 'the staff engineer’s path (for prakhar jain).epub'
+    NUM_TOKENS = 50
+    ITEM_PAGE = 11
+    START_INDEX = 15
     SPEED = "+20.00%"
     VOICE = "en-US-AriaNeural"
     STYLE = "narration-professional"
@@ -601,6 +748,18 @@ if __name__ == '__main__':
     TEXT_COLOR = "#77614F"
     HIGHLIGHT_COLOR = "#F57A10"
     FONT_NAME = 'Verdana'
+    TOP_TEXT_ROWS = 4
+    CENTER_TEXT_ROWS = 1
+    BOTTOM_TEXT_ROWS = 4
+    CENTER_TEXT_HEIGHT = 1
+    root = tk.Tk()
+    root.geometry(f"{root.winfo_screenwidth()}x{root.winfo_screenheight()}")
+    for i in range(14):
+        root.rowconfigure(i, weight=1)
+    for i in range(2):
+        root.columnconfigure(i, weight=1)
+    take_inputs()
+    ssml_strings, start_index = initial_setup()
     TOP_FONT_SIZE = 24
     BOTTOM_FONT_SIZE = 24
     CENTER_FONT_SIZE = 36
@@ -608,15 +767,12 @@ if __name__ == '__main__':
     SEPERATOR_LINE_WIDTH = 3
     TOP_TEXT_HEIGHT = 15
     TOP_TEXT_WIDTH = 100
-    TOP_TEXT_ROWS = 4
-    CENTER_TEXT_HEIGHT = 1
     CENTER_TEXT_WIDTH = 100
-    CENTER_TEXT_ROWS = 1
     BOTTOM_TEXT_HEIGHT = 15
     BOTTOM_TEXT_WIDTH = 100
-    BOTTOM_TEXT_ROWS = 4
-    ssml_strings, start_index = initial_setup()
-    root = tk.Tk()
+    SPACING_TOP_CENTER_TEXT = 24
+    SPACING_BOTTOM_CENTER_TEXT = 24
+    NUM_WORDS_IN_CENTER_TEXT = 5
     root.config(bg=BACKGROUND_COLOR)
     audio_queue = Queue()
     display_queue = Queue()
@@ -643,11 +799,11 @@ if __name__ == '__main__':
         skip_button = tk.Button(root, text="Skip", command=lambda: skip(None))
         root.bind("s", lambda event: skip(event))
 
-        play_button.grid(row=11, column=0, sticky="sew")
-        pause_button.grid(row=11, column=1, sticky="sew")
-        back_button.grid(row=11, column=2, sticky="sew")
-        restart_button.grid(row=11, column=3, sticky="sew")
-        skip_button.grid(row=11, column=4, sticky="sew")
+        play_button.grid(row=TOP_TEXT_ROWS+CENTER_TEXT_ROWS+BOTTOM_TEXT_ROWS+2, column=0, sticky="sew")
+        pause_button.grid(row=TOP_TEXT_ROWS+CENTER_TEXT_ROWS+BOTTOM_TEXT_ROWS+2, column=1, sticky="sew")
+        back_button.grid(row=TOP_TEXT_ROWS+CENTER_TEXT_ROWS+BOTTOM_TEXT_ROWS+2, column=2, sticky="sew")
+        restart_button.grid(row=TOP_TEXT_ROWS+CENTER_TEXT_ROWS+BOTTOM_TEXT_ROWS+2, column=3, sticky="sew")
+        skip_button.grid(row=TOP_TEXT_ROWS+CENTER_TEXT_ROWS+BOTTOM_TEXT_ROWS+2, column=4, sticky="sew")
 
         top_text = tk.Text(root, font=(FONT_NAME, TOP_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR,
                            height=TOP_TEXT_HEIGHT, width=TOP_TEXT_WIDTH, wrap="word")
@@ -655,22 +811,23 @@ if __name__ == '__main__':
         top_text.grid(row=0, column=0, rowspan=TOP_TEXT_ROWS, columnspan=5, sticky="sew")
 
         center_text = tk.Text(root, font=(FONT_NAME, CENTER_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR,
-                              height=CENTER_TEXT_HEIGHT, width=CENTER_TEXT_WIDTH, wrap="none", spacing1=24, spacing2=24)
-        center_text.grid(row=5, rowspan=CENTER_TEXT_ROWS, column=0, columnspan=5, sticky="nsew")
+                              height=CENTER_TEXT_HEIGHT, width=CENTER_TEXT_WIDTH, wrap="none", spacing1=SPACING_TOP_CENTER_TEXT, spacing2=SPACING_BOTTOM_CENTER_TEXT)
+        center_text.grid(row=TOP_TEXT_ROWS+1, rowspan=CENTER_TEXT_ROWS, column=0, columnspan=5, sticky="nsew")
 
         bottom_text = tk.Text(root, font=(FONT_NAME, BOTTOM_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR,
                               height=BOTTOM_TEXT_HEIGHT, width=BOTTOM_TEXT_WIDTH, wrap="word")
         bottom_text.tag_configure("center", justify="center")
-        bottom_text.grid(row=7, column=0, rowspan=BOTTOM_TEXT_ROWS, columnspan=5, sticky="new")
+        bottom_text.grid(row=TOP_TEXT_ROWS+CENTER_TEXT_ROWS+2, column=0, rowspan=BOTTOM_TEXT_ROWS, columnspan=5, sticky="new")
 
         top_line = tk.Canvas(root, height=1, bg=BACKGROUND_COLOR)
-        top_line.grid(row=4, column=0, columnspan=5, sticky="nsew")
+        top_line.grid(row=TOP_TEXT_ROWS, column=0, columnspan=5, sticky="nsew")
         top_line_color = TEXT_COLOR
         top_line_width = SEPERATOR_LINE_WIDTH
         bottom_line = tk.Canvas(root, height=1, bg=BACKGROUND_COLOR)
-        bottom_line.grid(row=6, column=0, columnspan=5, sticky="nsew")
+        bottom_line.grid(row=TOP_TEXT_ROWS+CENTER_TEXT_ROWS+1, column=0, columnspan=5, sticky="nsew")
         bottom_line_color = TEXT_COLOR
         bottom_line_width = SEPERATOR_LINE_WIDTH
+        root.bind("<Configure>", on_window_resize)
 
         for i in range(12):
             root.rowconfigure(i, weight=1)

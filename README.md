@@ -50,5 +50,11 @@ export SPEECH_KEY=<your_subscription_key>
 export SPEECH_REGION=<your_subscription_region>
 ```
 
+## Creating Executable
+
+```commandline
+pyinstaller rapid-read-pro.py --paths "v1/lib/python3.11/site-packages" --add-binary "v1/lib/python3.11/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "v1/lib/python3.11/site-packages/cffi:cffi" --hidden-import=_cffi_backend
+```
+
 ## Acknowledgements
 This script uses Azure's Text-to-Speech service for converting text into speech.
