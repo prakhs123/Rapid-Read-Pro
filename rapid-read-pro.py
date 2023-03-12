@@ -85,17 +85,26 @@ def get_speech_synthesizer(file_path):
 
 def create_ssml_string(text, doc_tag, emphasis_level):
     text = text.replace('\n', ' ')
-    return f"""
-        <{doc_tag}>
-            <mstts:express-as style="{STYLE}">
-                <prosody rate="{SPEED}">
-                    <emphasis level="{emphasis_level}">
-                        {text}
-                    </emphasis>
-                </prosody>
-            </mstts:express-as>
-        </{doc_tag}>"""
-
+    if STYLE in ['angry', 'chat', 'cheerful', 'customerservice', 'empathetic', 'excited', 'friendly', 'hopeful', 'narration-professional', 'newscast-casual', 'newscast-formal', 'sad', 'shouting', 'terrified', 'unfriendly', 'whispering']:
+        return f"""
+            <{doc_tag}>
+                <mstts:express-as style="{STYLE}">
+                    <prosody rate="{SPEED}">
+                        <emphasis level="{emphasis_level}">
+                            {text}
+                        </emphasis>
+                    </prosody>
+                </mstts:express-as>
+            </{doc_tag}>"""
+    else:
+        return f"""
+                    <{doc_tag}>
+                            <prosody rate="{SPEED}">
+                                <emphasis level="{emphasis_level}">
+                                    {text}
+                                </emphasis>
+                            </prosody>
+                    </{doc_tag}>"""
 
 def create_ssml_strings(contents, token_number, num_tokens, is_pdf=False):
     def reset_ssml_string():
