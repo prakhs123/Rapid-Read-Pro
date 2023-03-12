@@ -13,6 +13,7 @@ import xml.sax.saxutils
 from datetime import timedelta
 from queue import Queue, LifoQueue
 
+from PyPDF2 import PdfReader
 import azure.cognitiveservices.speech as speechsdk
 from bs4 import BeautifulSoup
 from ebooklib import epub
@@ -94,7 +95,7 @@ def create_ssml_string(text, doc_tag, emphasis_level):
         </{doc_tag}>"""
 
 
-def create_ssml_strings(contents, token_number, num_tokens):
+def create_ssml_strings(contents, token_number, num_tokens, is_pdf=False):
     def reset_ssml_string():
         nonlocal curr_ssml_string, current_token_number_inside_index, token_number
         if current_token_number_inside_index < 1:
@@ -118,27 +119,32 @@ def create_ssml_strings(contents, token_number, num_tokens):
     current_token_number_inside_index = 0
 
     for content in contents:
-        text = xml.sax.saxutils.escape(content.get_text())
+        if not is_pdf:
+            text = xml.sax.saxutils.escape(content.get_text())
 
-        if content.name.startswith('h1'):
-            doc_tag = "s"
-            emphasis_level = "strong"
-            reset_ssml_string()
-        elif content.name.startswith('h2') or content.name.startswith('h3'):
-            doc_tag = "s"
-            emphasis_level = "moderate"
-            reset_ssml_string()
+            if content.name.startswith('h1'):
+                doc_tag = "s"
+                emphasis_level = "strong"
+                reset_ssml_string()
+            elif content.name.startswith('h2') or content.name.startswith('h3'):
+                doc_tag = "s"
+                emphasis_level = "moderate"
+                reset_ssml_string()
+            else:
+                doc_tag = "p"
+                emphasis_level = "none"
+
+            if current_token_number_inside_index >= num_tokens:
+                reset_ssml_string()
+            if text == '':
+                reset_ssml_string()
+                continue
+            if len(text.split()) < 1:
+                continue
         else:
+            text = content
             doc_tag = "p"
             emphasis_level = "none"
-
-        if current_token_number_inside_index >= num_tokens:
-            reset_ssml_string()
-        if text == '':
-            reset_ssml_string()
-            continue
-        if len(text.split()) < 1:
-            continue
         token_string = create_ssml_string(text, doc_tag, emphasis_level)
         curr_ssml_string += token_string
         current_token_number_inside_index += 1
@@ -212,6 +218,10 @@ def initial_setup():
             item_page = ITEM_PAGE
             item = items[item_page]
             html = item.get_content()
+        elif EPUB_OR_HTML_FILE.endswith('.pdf'):
+            reader = PdfReader(EPUB_OR_HTML_FILE)
+            number_of_pages = len(reader.pages)
+            contents = [reader.pages[i].extract_text() for i in range(number_of_pages)]
         elif EPUB_OR_HTML_FILE.startswith('http'):
             session = HTMLSession()
             r = session.get(EPUB_OR_HTML_FILE)
@@ -225,16 +235,19 @@ def initial_setup():
     except FileNotFoundError:
         logging.error("The file is not found.")
         return
-    soup = BeautifulSoup(html, 'html.parser')
-    contents = []
-    if EPUB_OR_HTML_FILE.startswith('http'):
-        if soup.article:
-            contents = soup.article.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
-        elif soup.section:
-            contents = soup.section.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
+    if not EPUB_OR_HTML_FILE.endswith('.pdf'):
+        soup = BeautifulSoup(html, 'html.parser')
+        contents = []
+        if EPUB_OR_HTML_FILE.startswith('http'):
+            if soup.article:
+                contents = soup.article.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
+            elif soup.section:
+                contents = soup.section.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
+        else:
+            contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd'])
+        ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS)
     else:
-        contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd'])
-    ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS)
+        ssml_strings = create_ssml_strings(contents, 0 , NUM_TOKENS, True)
     for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ssml_strings):
         logging.info(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
     si = START_INDEX
@@ -739,8 +752,8 @@ def take_inputs():
 if __name__ == '__main__':
     EPUB_OR_HTML_FILE = 'the staff engineer’s path (for prakhar jain).epub'
     NUM_TOKENS = 50
-    ITEM_PAGE = 11
-    START_INDEX = 15
+    ITEM_PAGE = 0
+    START_INDEX = 0
     SPEED = "+20.00%"
     VOICE = "en-US-AriaNeural"
     STYLE = "narration-professional"
