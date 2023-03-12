@@ -826,7 +826,7 @@ if __name__ == '__main__':
         top_text.grid(row=0, column=0, rowspan=TOP_TEXT_ROWS, columnspan=5, sticky="sew")
 
         center_text = tk.Text(root, font=(FONT_NAME, CENTER_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR,
-                              height=CENTER_TEXT_HEIGHT, width=CENTER_TEXT_WIDTH, wrap="none", spacing1=SPACING_TOP_CENTER_TEXT, spacing2=SPACING_BOTTOM_CENTER_TEXT)
+                              height=CENTER_TEXT_HEIGHT, width=CENTER_TEXT_WIDTH, wrap="none")
         center_text.grid(row=TOP_TEXT_ROWS+1, rowspan=CENTER_TEXT_ROWS, column=0, columnspan=5, sticky="nsew")
 
         bottom_text = tk.Text(root, font=(FONT_NAME, BOTTOM_FONT_SIZE), bg=BACKGROUND_COLOR, fg=TEXT_COLOR,
