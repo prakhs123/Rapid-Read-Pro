@@ -844,7 +844,7 @@ if __name__ == '__main__':
         bottom_line_width = SEPERATOR_LINE_WIDTH
         root.bind("<Configure>", on_window_resize)
 
-        for i in range(12):
+        for i in range(14):
             root.rowconfigure(i, weight=1)
         root.rowconfigure(5, weight=2)
         for i in range(5):
