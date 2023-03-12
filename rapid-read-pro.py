@@ -764,7 +764,7 @@ if __name__ == '__main__':
     HIGHLIGHT_COLOR = "#F57A10"
     FONT_NAME = 'Verdana'
     TOP_TEXT_ROWS = 4
-    CENTER_TEXT_ROWS = 1
+    CENTER_TEXT_ROWS = 3
     BOTTOM_TEXT_ROWS = 4
     CENTER_TEXT_HEIGHT = 1
     root = tk.Tk()
