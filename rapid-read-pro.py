@@ -23,8 +23,8 @@ from requests_html import HTMLSession
 # configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-SPEECH_KEY = os.environ.get('SPEECH_KEY')
-SPEECH_REGION = os.environ.get('SPEECH_REGION')
+SPEECH_KEY = os.environ.get('SPEECH_KEY') if os.environ.get('SPEECH_KEY') else ""
+SPEECH_REGION = os.environ.get('SPEECH_REGION') if os.environ.get('SPEECH_REGION') else ""
 
 
 def speech_synthesis_get_available_voices(text):
