@@ -255,7 +255,7 @@ def initial_setup():
             elif soup.section:
                 contents = soup.section.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
         else:
-            contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd'])
+            contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li'])
         ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS)
     else:
         ssml_strings = create_ssml_strings(contents, 0 , NUM_TOKENS, True)
@@ -426,6 +426,8 @@ def get_data_from_azure(file_path, ssml_string):
 
 
 def start_audio_and_display(index):
+    if index >= (len(ssml_strings)):
+        return
     ssml_string, total_tokens, start_token, end_token = ssml_strings[index]
     logging.info(f"Current Index: {index}")
     logging.info(f"Reading from start_token: {start_token}, end_token {end_token}")
