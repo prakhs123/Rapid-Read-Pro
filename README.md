@@ -42,8 +42,17 @@ export SPEECH_REGION=<your_subscription_region>
 ## Creating Executable
 
 ```commandline
+# apple silicon macs
 pyinstaller rapid-read-pro.py --paths "v1/lib/python3.11/site-packages" --add-binary "v1/lib/python3.11/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "v1/lib/python3.11/site-packages/cffi:cffi" --hidden-import=_cffi_backend
 
+# intel macs
+arch -x86_64 /Library/Frameworks/Python.framework/Versions/3.9/bin/python3.9-intel64 -m venv v14
+source v14/bin/activate
+arch -x86_64 pip install -r requirements.txt
+arch -x86_64 pip install pyinstaller
+arch -x86_64 pyinstaller rapid-read-pro.py --paths "v14/lib/python3.9/site-packages" --add-binary "v14/lib/python3.9/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "v14/lib/python3.9/site-packages/cffi:cffi" --hidden-import=_cffi_backend --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro  -D --name rapid-read-pro --windowed --target-architecture x86_64
+
+# windows
 pyinstaller rapid-read-pro.py --paths "v1\Lib\site-packages" --add-binary "v1\Lib\site-packages\azure\cognitiveservices\speech\Microsoft.CognitiveServices.Speech.core.dll;." --add-data "v1\Lib\site-packages\cffi;cffi" --hidden-import=_cffi_backend
 ```
 
