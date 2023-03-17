@@ -87,7 +87,7 @@ def get_speech_synthesizer(file_path):
 
 def create_ssml_string(text, doc_tag, emphasis_level):
     text = text.replace('\n', ' ')
-    if STYLE in ['angry', 'chat', 'cheerful', 'customerservice', 'empathetic', 'excited', 'friendly', 'hopeful', 'narration-professional', 'newscast-casual', 'newscast-formal', 'sad', 'shouting', 'terrified', 'unfriendly', 'whispering']:
+    if STYLE != 'default':
         return f"""
             <{doc_tag}>
                 <mstts:express-as style="{STYLE}">
