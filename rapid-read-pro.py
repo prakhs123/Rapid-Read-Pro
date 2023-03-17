@@ -8,9 +8,11 @@ import tempfile
 import threading
 import time
 import tkinter as tk
+import tkinter.font as tkFont
 import xml.etree.ElementTree as ET
 import xml.sax.saxutils
 from datetime import timedelta
+from enum import Enum
 from queue import Queue, LifoQueue
 
 from PyPDF2 import PdfReader
@@ -258,7 +260,7 @@ def initial_setup():
             contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li'])
         ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS)
     else:
-        ssml_strings = create_ssml_strings(contents, 0 , NUM_TOKENS, True)
+        ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS, True)
     for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ssml_strings):
         logging.info(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
     si = START_INDEX
@@ -361,6 +363,8 @@ def display_word(playback):
             display_queue.put((word_index + 1, next_display_id,))
             if playback and round(playback.curr_pos * 1000) - (word_offset + word_time) > 700:
                 logging.info("SYNCING")
+                logging.info(f"Playback pos: {round(playback.curr_pos * 1000)}")
+                logging.info(f"Display pos: {(word_offset + word_time)}")
                 threading.Thread(target=pause_resume, args=(playback, 0.7), daemon=True).start()
 
 
@@ -614,16 +618,21 @@ def on_window_resize(event):
                            width=BOTTOM_TEXT_WIDTH)
 
 
-def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, bg_color_entry, bg_color_label, text_color_entry, text_color_label, highlight_color_entry, highlight_color_label, font_name_entry, font_name_label, file_entry, file_label, num_tokens_entry, num_tokens_label, item_page_entry, item_page_label, start_index_entry, start_index_label,  speech_key_label, speech_key_entry, speech_region_label, speech_region_entry, update_button):
-    global SPEED, VOICE, STYLE, BACKGROUND_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, FONT_NAME, EPUB_OR_HTML_FILE, \
+def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, color_options_entry, color_options_label, font_name_entry, font_name_label, file_entry, file_label, num_tokens_entry, num_tokens_label, item_page_entry, item_page_label, start_index_entry, start_index_label,  speech_key_label, speech_key_entry, speech_region_label, speech_region_entry, update_button):
+    global SPEED, VOICE, STYLE, BACKGROUND_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, COLOR_OPTION, FONT_NAME, FONT_OPTION, EPUB_OR_HTML_FILE, \
         NUM_TOKENS, ITEM_PAGE, START_INDEX, SPEECH_KEY, SPEECH_REGION
-    SPEED = speed_entry.get()
-    VOICE = voice_entry.get()
-    STYLE = style_entry.get()
-    BACKGROUND_COLOR = bg_color_entry.get()
-    TEXT_COLOR = text_color_entry.get()
-    HIGHLIGHT_COLOR = highlight_color_entry.get()
-    FONT_NAME = font_name_entry.get()
+    SPEED = SPEED.get()
+    VOICE = VOICE.get()
+    STYLE = STYLE.get()
+    COLOR_OPTION = COLOR_OPTION.get()
+    SELECTED_COLOR_OPTION = COLOR_OPTIONS.personal_favourite
+    for c in COLOR_OPTIONS:
+        if c._name_ == COLOR_OPTION:
+            SELECTED_COLOR_OPTION = c
+    BACKGROUND_COLOR = SELECTED_COLOR_OPTION.bg
+    TEXT_COLOR = SELECTED_COLOR_OPTION.text
+    HIGHLIGHT_COLOR = SELECTED_COLOR_OPTION.highlight
+    FONT_NAME = FONT_OPTION.get()
     EPUB_OR_HTML_FILE = file_entry.get()
     NUM_TOKENS = num_tokens_entry.get()
     ITEM_PAGE = item_page_entry.get()
@@ -636,12 +645,8 @@ def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style
     voice_label.destroy()
     style_entry.destroy()
     style_label.destroy()
-    bg_color_entry.destroy()
-    bg_color_label.destroy()
-    text_color_entry.destroy()
-    text_color_label.destroy()
-    highlight_color_entry.destroy()
-    highlight_color_label.destroy()
+    color_options_entry.destroy()
+    color_options_label.destroy()
     font_name_entry.destroy()
     font_name_label.destroy()
     file_entry.destroy()
@@ -659,37 +664,84 @@ def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style
     update_button.destroy()
 
 
+def get_list_of_available_voices_with_styles():
+    speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SPEECH_REGION)
+    speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
+    r = speech_synthesizer.get_voices_async().get()
+    en_voices = [v for v in r.voices if v._locale.startswith("en")]
+    voices_with_styles = [(v._short_name, v._style_list if v._style_list[0] != '' else ['default']) for v in en_voices]
+    return voices_with_styles
+
+
+def get_styles_of_voice(voices_with_styles, voice):
+    for v, s in voices_with_styles:
+        if v == voice:
+            return s
+
+
+def update_style_based_on_voices(voices_with_styles, style_entry):
+    current_set_voice = VOICE.get()
+    styles = get_styles_of_voice(voices_with_styles, current_set_voice)
+    STYLE.set(styles[0])
+    style_entry['menu'].delete(0, 'end')
+    for style in styles:
+        style_entry['menu'].add_command(label=style, command=tk._setit(STYLE, style))
+
+SUPPORTED_FONTS = ['Verdana',
+                   'Arial',
+                   'Times New Roman',
+                   'Comic Sans MS',
+                   'Courier New',
+                   'Georgia',
+                   'Helvetica',
+                   'Merriweather',
+                   'Source Code Pro',
+                   'Tahoma',
+                   'Calibri',
+                   'Lato']
+
+class COLOR_OPTIONS(Enum):
+    personal_favourite = ('Personal Favourite', '#F7ECCF', '#77614F', '#F57A10')
+    pale_pink = ('Pale pink', '#F3EFEF', '#333333', '#F7B32B')
+    light_gray_1 = ('Light gray 1', '#F5F5F5', '#333333', '#4A90E2')
+    light_gray_2 = ('Light gray 2', '#E6E6E6', '#3E3E3E', '#FF9900')
+    nearly_white_1 = ('Nearly white 1', '#F2F2F2', '#4A4A4A', '#7C8E00')
+    pale_gray = ('Pale gray', '#ECECEC', '#424242', '#ED1C24')
+    cream = ('Cream', '#FFF5E6', '#333333', '#FFCC33')
+    light_gray_3 = ('Light gray 3', '#F0F0F0', '#3B3B3B', '#003366')
+    nearly_white_2 = ('Nearly white 2', '#EDEDED', '#333333', '#00BFFF')
+    pale_beige = ('Pale beige', '#FAF6F1', '#444444', '#FF6347')
+
+    def __init__(self, name, bg, text, highlight):
+        self._name_ = name
+        self.bg = bg
+        self.text = text
+        self.highlight = highlight
+
+    def __repr__(self):
+        return self._name_
+
+
 def take_inputs():
     global SPEED, VOICE, STYLE, BACKGROUND_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, FONT_NAME, EPUB_OR_HTML_FILE, \
         NUM_TOKENS, ITEM_PAGE, START_INDEX
     # Create input fields for each default value
-    speed_label = tk.Label(root, text="Speed")
-    speed_entry = tk.Entry(root)
-    speed_entry.insert(0, SPEED)
+    speed_label = tk.Label(root, text="Speed in range (0.5 to 2)")
+    speed_entry = tk.Spinbox(root, format="%.2f", increment=0.10, from_=0.5, to=2, textvariable=SPEED)
 
+    voices_with_styles = get_list_of_available_voices_with_styles()
     voice_label = tk.Label(root, text="Voice")
-    voice_entry = tk.Entry(root)
-    voice_entry.insert(0, VOICE)
-
+    voices_choices = (v for v, _ in voices_with_styles)
+    voice_entry = tk.OptionMenu(root, VOICE, *voices_choices)
     style_label = tk.Label(root, text="Style")
-    style_entry = tk.Entry(root)
-    style_entry.insert(0, STYLE)
+    style_entry = tk.OptionMenu(root, STYLE, *tuple(get_styles_of_voice(voices_with_styles, VOICE.get())))
+    VOICE.trace("w", lambda *args: update_style_based_on_voices(voices_with_styles, style_entry))
 
-    bg_color_label = tk.Label(root, text="Background Color")
-    bg_color_entry = tk.Entry(root)
-    bg_color_entry.insert(0, BACKGROUND_COLOR)
-
-    text_color_label = tk.Label(root, text="Text Color")
-    text_color_entry = tk.Entry(root)
-    text_color_entry.insert(0, TEXT_COLOR)
-
-    highlight_color_label = tk.Label(root, text="Highlight Color")
-    highlight_color_entry = tk.Entry(root)
-    highlight_color_entry.insert(0, HIGHLIGHT_COLOR)
+    color_options_label = tk.Label(root, text="Color Options")
+    color_options_entry = tk.OptionMenu(root, COLOR_OPTION, *(c._name_ for c in COLOR_OPTIONS))
 
     font_name_label = tk.Label(root, text="Font Name")
-    font_name_entry = tk.Entry(root)
-    font_name_entry.insert(0, FONT_NAME)
+    font_name_entry = tk.OptionMenu(root, FONT_OPTION, *(f for f in tkFont.families() if f in SUPPORTED_FONTS))
 
     file_label = tk.Label(root, text="Epub or HTML file")
     file_entry = tk.Entry(root)
@@ -715,7 +767,7 @@ def take_inputs():
     speech_region_entry = tk.Entry(root)
     speech_region_entry.insert(0, SPEECH_REGION)
 
-    update_button = tk.Button(root, text="Update Values", command=lambda: get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, bg_color_entry, bg_color_label, text_color_entry, text_color_label, highlight_color_entry, highlight_color_label, font_name_entry, font_name_label, file_entry, file_label, num_tokens_entry, num_tokens_label, item_page_entry, item_page_label, start_index_entry, start_index_label, speech_key_label, speech_key_entry, speech_region_label, speech_region_entry, update_button))
+    update_button = tk.Button(root, text="Update Values", command=lambda: get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, color_options_entry, color_options_label, font_name_entry, font_name_label, file_entry, file_label, num_tokens_entry, num_tokens_label, item_page_entry, item_page_label, start_index_entry, start_index_label, speech_key_label, speech_key_entry, speech_region_label, speech_region_entry, update_button))
 
     # Place input fields on window using grid layout
     speed_label.grid(row=0, column=0)
@@ -727,14 +779,8 @@ def take_inputs():
     style_label.grid(row=2, column=0)
     style_entry.grid(row=2, column=1)
 
-    bg_color_label.grid(row=3, column=0)
-    bg_color_entry.grid(row=3, column=1)
-
-    text_color_label.grid(row=4, column=0)
-    text_color_entry.grid(row=4, column=1)
-
-    highlight_color_label.grid(row=5, column=0)
-    highlight_color_entry.grid(row=5, column=1)
+    color_options_label.grid(row=3, column=0)
+    color_options_entry.grid(row=3, column=1)
 
     font_name_label.grid(row=6, column=0)
     font_name_entry.grid(row=6, column=1)
@@ -763,13 +809,10 @@ def take_inputs():
 
 
 if __name__ == '__main__':
-    EPUB_OR_HTML_FILE = 'the staff engineer’s path (for prakhar jain).epub'
-    NUM_TOKENS = 50
-    ITEM_PAGE = 0
+    EPUB_OR_HTML_FILE = '/Users/prakharjain/PycharmProjects/Rapid-Read-Pro/designing data-intensive applications (for prakhar).epub'
+    NUM_TOKENS = 5
+    ITEM_PAGE = 8
     START_INDEX = 0
-    SPEED = "+20.00%"
-    VOICE = "en-US-AriaNeural"
-    STYLE = "narration-professional"
     BACKGROUND_COLOR = '#F7ECCF'
     TEXT_COLOR = "#77614F"
     HIGHLIGHT_COLOR = "#F57A10"
@@ -779,7 +822,12 @@ if __name__ == '__main__':
     BOTTOM_TEXT_ROWS = 4
     CENTER_TEXT_HEIGHT = 1
     root = tk.Tk()
-    root.geometry(f"{root.winfo_screenwidth()}x{root.winfo_screenheight()}")
+    SPEED = tk.StringVar(value="1.20")
+    VOICE = tk.StringVar(value="en-US-AriaNeural")
+    STYLE = tk.StringVar(value="narration-professional")
+    COLOR_OPTION = tk.StringVar(value=repr(COLOR_OPTIONS.personal_favourite))
+    FONT_OPTION = tk.StringVar(value='Verdana')
+    root.geometry("2560x1440+1280+0")
     for i in range(14):
         root.rowconfigure(i, weight=1)
     for i in range(2):
