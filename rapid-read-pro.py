@@ -257,6 +257,9 @@ def initial_setup():
             elif soup.section:
                 contents = soup.section.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
         else:
+            # remove all tables
+            for s in soup.find_all(['tr', 'th', 'td']):
+                s.extract()
             contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li'])
         ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS)
     else:
@@ -809,7 +812,7 @@ def take_inputs():
 
 
 if __name__ == '__main__':
-    EPUB_OR_HTML_FILE = '/Users/prakharjain/PycharmProjects/Rapid-Read-Pro/designing data-intensive applications (for prakhar).epub'
+    EPUB_OR_HTML_FILE = '/Users/prakharjain/Calibre Library/Alan D. Moore/Python GUI Programming with Tkinter, 2nd edition (for Naina Jain) (29)/Python GUI Programming with Tkinter, 2nd e - Alan D. Moore.epub'
     NUM_TOKENS = 5
     ITEM_PAGE = 8
     START_INDEX = 0
