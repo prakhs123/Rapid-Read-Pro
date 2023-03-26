@@ -44,6 +44,10 @@ class MainApp(tk.Tk):
         self.create_window()
 
     def on_closing(self):
+        if isinstance(self.window, RapidReadProApp):
+            if self.window.playback:
+                self.window.playback.stop()
+                del self.window.playback
         if os.path.exists(self.tmp):
             logging.info("Deleting tmp directory")
             shutil.rmtree(self.tmp)
