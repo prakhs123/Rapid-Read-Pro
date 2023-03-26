@@ -8,6 +8,8 @@ import tempfile
 import threading
 import time
 import tkinter as tk
+from tkinter import ttk
+from tkinter import filedialog
 import tkinter.font as tkFont
 import xml.etree.ElementTree as ET
 import xml.sax.saxutils
@@ -87,11 +89,11 @@ def get_speech_synthesizer(file_path):
 
 def create_ssml_string(text, doc_tag, emphasis_level):
     text = text.replace('\n', ' ')
-    if STYLE != 'default':
+    if STYLE.get() != 'default':
         return f"""
             <{doc_tag}>
-                <mstts:express-as style="{STYLE}">
-                    <prosody rate="{SPEED}">
+                <mstts:express-as style="{STYLE.get()}">
+                    <prosody rate="{SPEED.get()}">
                         <emphasis level="{emphasis_level}">
                             {text}
                         </emphasis>
@@ -101,7 +103,7 @@ def create_ssml_string(text, doc_tag, emphasis_level):
     else:
         return f"""
                     <{doc_tag}>
-                            <prosody rate="{SPEED}">
+                            <prosody rate="{SPEED.get()}">
                                 <emphasis level="{emphasis_level}">
                                     {text}
                                 </emphasis>
@@ -124,7 +126,7 @@ def create_ssml_strings(contents, token_number, num_tokens, is_pdf=False):
 
     ssml_strings = []
     header = f"""<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
-        <voice name="{VOICE}">"""
+        <voice name="{VOICE.get()}">"""
     footer = """
         </voice>
     </speak>"""
@@ -217,76 +219,73 @@ def parse_args():
     return parser.parse_args()
 
 
-def initial_setup():
-    global EPUB_OR_HTML_FILE, NUM_TOKENS, ITEM_PAGE, START_INDEX
-    ITEM_PAGE = int(ITEM_PAGE)
-    NUM_TOKENS = int(NUM_TOKENS)
-    START_INDEX = int(START_INDEX)
-    try:
-        if EPUB_OR_HTML_FILE.endswith('.epub'):
-            book = epub.read_epub(EPUB_OR_HTML_FILE)
-            items = [item for item in book.get_items() if item.get_type() == 9]
-            for pg_no, item in enumerate(items):
-                logging.info(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}")
-            item_page = ITEM_PAGE
-            item = items[item_page]
-            html = item.get_content()
-        elif EPUB_OR_HTML_FILE.endswith('.pdf'):
-            reader = PdfReader(EPUB_OR_HTML_FILE)
-            number_of_pages = len(reader.pages)
-            contents = [reader.pages[i].extract_text() for i in range(number_of_pages)]
-        elif EPUB_OR_HTML_FILE.startswith('http'):
-            session = HTMLSession()
-            r = session.get(EPUB_OR_HTML_FILE)
-            html = r.text
-            session.close()
-        elif EPUB_OR_HTML_FILE.endswith('.html'):
-            with open(EPUB_OR_HTML_FILE, 'r') as file:
-                html = file.read()
-        else:
-            raise Exception('File Not Supported')
-    except FileNotFoundError:
-        logging.error("The file is not found.")
-        return
-    if not EPUB_OR_HTML_FILE.endswith('.pdf'):
-        soup = BeautifulSoup(html, 'html.parser')
-        contents = []
-        if EPUB_OR_HTML_FILE.startswith('http'):
-            if soup.article:
-                contents = soup.article.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
-            elif soup.section:
-                contents = soup.section.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
-        else:
-            # remove all tables
-            for s in soup.find_all(['tr', 'th', 'td']):
-                s.extract()
-            contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li'])
-        ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS)
-    else:
-        ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS, True)
-    for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ssml_strings):
-        logging.info(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
-    si = START_INDEX
-    return ssml_strings, si
+# def initial_setup(event, num_tokens):
+#     try:
+#         if EPUB_OR_HTML_FILE.endswith('.epub'):
+#             book = epub.read_epub(EPUB_OR_HTML_FILE)
+#             items = [item for item in book.get_items() if item.get_type() == 9]
+#             for pg_no, item in enumerate(items):
+#                 logging.info(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}")
+#             item_page = ITEM_PAGE
+#             item = items[item_page]
+#             html = item.get_content()
+#         elif EPUB_OR_HTML_FILE.endswith('.pdf'):
+#             reader = PdfReader(EPUB_OR_HTML_FILE)
+#             number_of_pages = len(reader.pages)
+#             contents = [reader.pages[i].extract_text() for i in range(number_of_pages)]
+#         elif EPUB_OR_HTML_FILE.startswith('http'):
+#             session = HTMLSession()
+#             r = session.get(EPUB_OR_HTML_FILE)
+#             html = r.text
+#             session.close()
+#         elif EPUB_OR_HTML_FILE.endswith('.html'):
+#             with open(EPUB_OR_HTML_FILE, 'r') as file:
+#                 html = file.read()
+#         else:
+#             raise Exception('File Not Supported')
+#     except FileNotFoundError:
+#         logging.error("The file is not found.")
+#         return
+#     if not EPUB_OR_HTML_FILE.endswith('.pdf'):
+#     soup = BeautifulSoup(html, 'html.parser')
+#     contents = []
+#         if EPUB_OR_HTML_FILE.startswith('http'):
+#             if soup.article:
+#                 contents = soup.article.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
+#             elif soup.section:
+#                 contents = soup.section.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
+#         else:
+#         remove all tables
+#     for s in soup.find_all(['tr', 'th', 'td']):
+#         s.extract()
+#     contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li'])
+#     ssml_strings = create_ssml_strings(contents, 0, num_tokens)
+#     else:
+#         ssml_strings = create_ssml_strings(contents, 0, NUM_TOKENS, True)
+#     lines = []
+#     for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ssml_strings):
+#         lines.append(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
+#     si = START_INDEX
+#     return ssml_strings, si
 
 
 def switch(word_length):
     return {
-        1: 0,  # First letter
-        2: 1,  # Second letter
-        3: 1,  # Second letter
-        4: 1,  # Second letter
-        5: 1,  # Second letter
-        6: 2,  # Third letter
-        7: 2,  # Third letter
-        8: 2,  # Third letter
-        9: 2,  # Third letter
-        10: 3,  # Fourth letter
-        11: 3,  # Fourth letter
-        12: 3,  # Fourth letter
-        13: 3,  # Fourth letter
+        1: 0,
+        2: 1,
+        3: 1,
+        4: 1,
+        5: 1,
+        6: 2,
+        7: 2,
+        8: 2,
+        9: 2,
+        10: 3,
+        11: 3,
+        12: 3,
+        13: 3,
         0: -1,
-    }.get(word_length, 4)  # Fifth letter
+    }.get(word_length, 4)
 
 
 def display_word(playback):
@@ -621,9 +620,9 @@ def on_window_resize(event):
                            width=BOTTOM_TEXT_WIDTH)
 
 
-def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, color_options_entry, color_options_label, font_name_entry, font_name_label, file_entry, file_label, num_tokens_entry, num_tokens_label, item_page_entry, item_page_label, start_index_entry, start_index_label,  speech_key_label, speech_key_entry, speech_region_label, speech_region_entry, update_button):
+def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, color_options_entry, color_options_label, font_name_entry, font_name_label, update_button):
     global SPEED, VOICE, STYLE, BACKGROUND_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, COLOR_OPTION, FONT_NAME, FONT_OPTION, EPUB_OR_HTML_FILE, \
-        NUM_TOKENS, ITEM_PAGE, START_INDEX, SPEECH_KEY, SPEECH_REGION
+        NUM_TOKENS, ITEM_PAGE, START_INDEX
     SPEED = SPEED.get()
     VOICE = VOICE.get()
     STYLE = STYLE.get()
@@ -636,12 +635,6 @@ def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style
     TEXT_COLOR = SELECTED_COLOR_OPTION.text
     HIGHLIGHT_COLOR = SELECTED_COLOR_OPTION.highlight
     FONT_NAME = FONT_OPTION.get()
-    EPUB_OR_HTML_FILE = file_entry.get()
-    NUM_TOKENS = num_tokens_entry.get()
-    ITEM_PAGE = item_page_entry.get()
-    START_INDEX = start_index_entry.get()
-    SPEECH_KEY = speech_key_entry.get()
-    SPEECH_REGION = speech_region_entry.get()
     speed_entry.destroy()
     speed_label.destroy()
     voice_entry.destroy()
@@ -652,18 +645,6 @@ def get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style
     color_options_label.destroy()
     font_name_entry.destroy()
     font_name_label.destroy()
-    file_entry.destroy()
-    file_label.destroy()
-    num_tokens_entry.destroy()
-    num_tokens_label.destroy()
-    item_page_entry.destroy()
-    item_page_label.destroy()
-    start_index_entry.destroy()
-    start_index_label.destroy()
-    speech_key_entry.destroy()
-    speech_key_label.destroy()
-    speech_region_entry.destroy()
-    speech_region_label.destroy()
     update_button.destroy()
 
 
@@ -726,8 +707,7 @@ class COLOR_OPTIONS(Enum):
 
 
 def take_inputs():
-    global SPEED, VOICE, STYLE, BACKGROUND_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, FONT_NAME, EPUB_OR_HTML_FILE, \
-        NUM_TOKENS, ITEM_PAGE, START_INDEX
+    global SPEED, VOICE, STYLE, BACKGROUND_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, FONT_NAME
     # Create input fields for each default value
     speed_label = tk.Label(root, text="Speed in range (0.5 to 2)")
     speed_entry = tk.Spinbox(root, format="%.2f", increment=0.10, from_=0.5, to=2, textvariable=SPEED)
@@ -746,31 +726,7 @@ def take_inputs():
     font_name_label = tk.Label(root, text="Font Name")
     font_name_entry = tk.OptionMenu(root, FONT_OPTION, *(f for f in tkFont.families() if f in SUPPORTED_FONTS))
 
-    file_label = tk.Label(root, text="Epub or HTML file")
-    file_entry = tk.Entry(root)
-    file_entry.insert(0, EPUB_OR_HTML_FILE)
-
-    num_tokens_label = tk.Label(root, text="Number of Tokens")
-    num_tokens_entry = tk.Entry(root)
-    num_tokens_entry.insert(0, str(NUM_TOKENS))
-
-    item_page_label = tk.Label(root, text="Item Page")
-    item_page_entry = tk.Entry(root)
-    item_page_entry.insert(0, str(ITEM_PAGE))
-
-    start_index_label = tk.Label(root, text="Start Index")
-    start_index_entry = tk.Entry(root)
-    start_index_entry.insert(0, str(START_INDEX))
-
-    speech_key_label = tk.Label(root, text="SPEECH_KEY")
-    speech_key_entry = tk.Entry(root)
-    speech_key_entry.insert(0, SPEECH_KEY)
-
-    speech_region_label = tk.Label(root, text="SPEECH_REGION")
-    speech_region_entry = tk.Entry(root)
-    speech_region_entry.insert(0, SPEECH_REGION)
-
-    update_button = tk.Button(root, text="Update Values", command=lambda: get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, color_options_entry, color_options_label, font_name_entry, font_name_label, file_entry, file_label, num_tokens_entry, num_tokens_label, item_page_entry, item_page_label, start_index_entry, start_index_label, speech_key_label, speech_key_entry, speech_region_label, speech_region_entry, update_button))
+    update_button = tk.Button(root, text="Update Values", command=lambda: get_updated_values(speed_entry, speed_label, voice_entry, voice_label, style_entry, style_label, color_options_entry, color_options_label, font_name_entry, font_name_label, update_button))
 
     # Place input fields on window using grid layout
     speed_label.grid(row=0, column=0)
@@ -785,37 +741,116 @@ def take_inputs():
     color_options_label.grid(row=3, column=0)
     color_options_entry.grid(row=3, column=1)
 
-    font_name_label.grid(row=6, column=0)
-    font_name_entry.grid(row=6, column=1)
+    font_name_label.grid(row=4, column=0)
+    font_name_entry.grid(row=4, column=1)
 
-    file_label.grid(row=7, column=0)
-    file_entry.grid(row=7, column=1)
-
-    num_tokens_label.grid(row=8, column=0)
-    num_tokens_entry.grid(row=8, column=1)
-
-    item_page_label.grid(row=9, column=0)
-    item_page_entry.grid(row=9, column=1)
-
-    start_index_label.grid(row=10, column=0)
-    start_index_entry.grid(row=10, column=1)
-
-    speech_key_label.grid(row=11, column=0)
-    speech_key_entry.grid(row=11, column=1)
-
-    speech_region_label.grid(row=12, column=0)
-    speech_region_entry.grid(row=12, column=1)
-
-    update_button.grid(row=13, column=1)
+    update_button.grid(row=5, column=1)
     # Set Values
     root.wait_window(update_button)
 
 
+def open_epub(epub_filepath):
+    filename = filedialog.askopenfilename(title="Add Epub File",
+                                          defaultextension=".epub")
+    epub_filepath.set(filename)
+
+
+def take_epub_inputs():
+    def initial_setup(event):
+        global ssml_strings
+
+        def set_epub_vars(event):
+            global start_index
+            selected_index = listbox2.get(listbox2.curselection())
+            si = int(selected_index[len("Index: ")-1: selected_index.index(',')])
+            start_index = si
+            listbox2.destroy()
+
+        selected_item = listbox.get(listbox.curselection())
+        item_page = int(selected_item[len("ITEM PAGE: ")-1: selected_item.index(',')])
+        item = items[item_page]
+        html = item.get_content()
+        soup = BeautifulSoup(html, 'html.parser')
+        for s in soup.find_all(['tr', 'th', 'td']):
+            s.extract()
+        contents = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li'])
+        ss = create_ssml_strings(contents, 0, int(NUM_TOKENS_VAR.get()))
+        ssml_strings = ss.copy()
+        add_epub_button.destroy()
+        tokens_entry.destroy()
+        tokens_label.destroy()
+        listbox.destroy()
+        toc_lines = []
+        for i, (ssml_string, total_tokens, start_token, end_token) in enumerate(ss):
+            toc_lines.append(f"Index: {i}, Text Heading: {extract_first_emphasis_text(ssml_string)}")
+        listbox2 = tk.Listbox(root)
+        listbox2.grid(row=0, column=0, rowspan=3, columnspan=2, sticky="nsew")
+        for toc_line in toc_lines:
+            listbox2.insert(tk.END, toc_line)
+        listbox2.bind("<<ListboxSelect>>", set_epub_vars)
+        root.wait_window(listbox2)
+
+    root.geometry("400x100")
+    root.eval('tk::PlaceWindow . center')
+
+    epub_filepath = tk.StringVar(value="")
+    add_epub_button = ttk.Button(root, text="Add EPUB", command=lambda: open_epub(epub_filepath))
+    add_epub_button.grid(row=1, column=0, columnspan=2, sticky="nsew")
+
+    tokens_label = ttk.Label(root, text="Number of tokens")
+    tokens_entry = ttk.Entry(root, textvariable=NUM_TOKENS_VAR)
+    tokens_label.grid(row=0, column=0, sticky="nsew")
+    tokens_entry.grid(row=0, column=1, sticky="nsew")
+    root.wait_variable(epub_filepath)
+    add_epub_button.destroy()
+    tokens_entry.destroy()
+    tokens_label.destroy()
+    book = epub.read_epub(epub_filepath.get())
+    items = [item for item in book.get_items() if item.get_type() == 9]
+    lines = []
+    for pg_no, item in enumerate(items):
+        lines.append(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}\n")
+    listbox = tk.Listbox(root)
+    listbox.grid(row=0, column=0, rowspan=2, columnspan=2, sticky="nsew")
+    for line in lines:
+        listbox.insert(tk.END, line)
+    listbox.bind("<<ListboxSelect>>", initial_setup)
+    root.wait_window(listbox)
+
+
+def store_azure_credentials(speech_region_entry, speech_region_label, speech_key_entry, speech_key_label, update_azure_credentials):
+    global SPEECH_KEY, SPEECH_REGION
+    SPEECH_KEY = SPEECH_KEY_VAR.get()
+    SPEECH_REGION = SPEECH_REGION_VAR.get()
+    speech_region_entry.destroy()
+    speech_key_entry.destroy()
+    speech_key_label.destroy()
+    speech_region_label.destroy()
+    update_azure_credentials.destroy()
+
+
+def take_azure_credentials():
+    global SPEECH_KEY_VAR, SPEECH_REGION_VAR
+    root.geometry("400x100")
+    root.eval('tk::PlaceWindow . center')
+    speech_key_label = ttk.Label(root, text="SPEECH_KEY")
+    speech_key_entry = ttk.Entry(root, textvariable=SPEECH_KEY_VAR)
+
+    speech_region_label = ttk.Label(root, text="SPEECH_REGION")
+    speech_region_entry = ttk.Entry(root, textvariable=SPEECH_REGION_VAR)
+
+    update_azure_credentials = ttk.Button(root, command=lambda: store_azure_credentials(speech_region_entry, speech_region_label, speech_key_entry, speech_key_label, update_azure_credentials), text='Next')
+    speech_key_label.grid(row=0, column=0, sticky="nsew")
+    speech_key_entry.grid(row=0, column=1, sticky="nsew")
+    speech_region_label.grid(row=1, column=0, sticky="nsew")
+    speech_region_entry.grid(row=1, column=1, sticky="nsew")
+    update_azure_credentials.grid(row=2, columnspan=2, sticky="nsew")
+    root.wait_window(update_azure_credentials)
+
+
 if __name__ == '__main__':
-    EPUB_OR_HTML_FILE = '/Users/prakharjain/Calibre Library/Alan D. Moore/Python GUI Programming with Tkinter, 2nd edition (for Naina Jain) (29)/Python GUI Programming with Tkinter, 2nd e - Alan D. Moore.epub'
-    NUM_TOKENS = 5
-    ITEM_PAGE = 8
-    START_INDEX = 0
+    ssml_strings = ""
+    start_index = 0
     BACKGROUND_COLOR = '#F7ECCF'
     TEXT_COLOR = "#77614F"
     HIGHLIGHT_COLOR = "#F57A10"
@@ -830,13 +865,13 @@ if __name__ == '__main__':
     STYLE = tk.StringVar(value="narration-professional")
     COLOR_OPTION = tk.StringVar(value=repr(COLOR_OPTIONS.personal_favourite))
     FONT_OPTION = tk.StringVar(value='Verdana')
-    root.geometry("2560x1440+1280+0")
-    for i in range(14):
-        root.rowconfigure(i, weight=1)
-    for i in range(2):
-        root.columnconfigure(i, weight=1)
+    SPEECH_KEY_VAR = tk.StringVar(value=SPEECH_KEY)
+    SPEECH_REGION_VAR = tk.StringVar(value=SPEECH_REGION)
+    NUM_TOKENS_VAR = tk.StringVar(value="5")
+    take_azure_credentials()
+    take_epub_inputs()
     take_inputs()
-    ssml_strings, start_index = initial_setup()
+    # root.geometry("2560x1440+1280+0")
     TOP_FONT_SIZE = 24
     BOTTOM_FONT_SIZE = 24
     CENTER_FONT_SIZE = 36

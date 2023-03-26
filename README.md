@@ -7,8 +7,6 @@ This script enables the conversion of EPUB/HTML files or web pages with articles
 
 Once the input is converted into HTML, the HTML content is divided into multiple ssml strings (XML), which are referred to as "Index." Each ssml string contains headings or paragraphs, which are further divided into smaller units called "tokens." The HTML page can be split into ssml strings either by headings or by a specified number of tokens (default 1).
 
-Note Pdf support added
-
 This script not only provides background TTS but also displays the text's words using Rapid Serial Visual Presentation (RSVP) technique, allowing for more efficient reading.
 
 ## Prerequisites
@@ -26,7 +24,7 @@ This script not only provides background TTS but also displays the text's words 
 ## How to use
 Clone or download the repository.
 Install the required packages from the requirements.txt file using pip install -r requirements.txt.
-Run the application using python rapid-read-pro.py
+Run the application using python MainApp.py
 The application window will open. You can play/pause, resume, go back, or skip to any part of the audio.
 
 Tokens are the smallest unit, and a single SSML string can contain one or more tokens. By properly utilizing num-token and start-index, the project can accurately generate speech output from the HTML page's multiple SSML string and their contained tokens.
@@ -42,15 +40,12 @@ export SPEECH_REGION=<your_subscription_region>
 ## Creating Executable
 
 ```commandline
-# apple silicon macs
-pyinstaller rapid-read-pro.py --paths "v1/lib/python3.11/site-packages" --add-binary "v1/lib/python3.11/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "v1/lib/python3.11/site-packages/cffi:cffi" --hidden-import=_cffi_backend
-
-# intel macs
+# intel macs build on silicon macs
 arch -x86_64 /Library/Frameworks/Python.framework/Versions/3.9/bin/python3.9-intel64 -m venv v14
 source v14/bin/activate
 arch -x86_64 pip install -r requirements.txt
 arch -x86_64 pip install pyinstaller
-arch -x86_64 pyinstaller rapid-read-pro.py --paths "v14/lib/python3.9/site-packages" --add-binary "v14/lib/python3.9/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "v14/lib/python3.9/site-packages/cffi:cffi" --hidden-import=_cffi_backend --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro  -D --name rapid-read-pro --windowed --target-architecture x86_64
+arch -x86_64 pyinstaller MainApp.py --paths "v16/lib/python3.9/site-packages" --add-binary "v16/lib/python3.9/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "InputsApp.py:." --add-data "EpubConfigurationApp.py:." --add-data "IndexConfigurationApp.py:." --add-data "ReadingConfigurationApp.py:." --add-data "RapidReadProApp.py:." --add-data "ColorOptions.py:." --add-data "Words.py:." --add-data "v16/lib/python3.9/site-packages/cffi:cffi" --hidden-import=_cffi_backend --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro  -D --name rapid-read-pro --windowed --target-architecture x86_64
 
 # windows
 pyinstaller rapid-read-pro.py --paths "v1\Lib\site-packages" --add-binary "v1\Lib\site-packages\azure\cognitiveservices\speech\Microsoft.CognitiveServices.Speech.core.dll;." --add-data "v1\Lib\site-packages\cffi;cffi" --hidden-import=_cffi_backend
