@@ -1,10 +1,11 @@
 import tkinter as tk
 from tkinter import ttk
+
+import pdfplumber
 from ebooklib import epub
 import ebooklib
 from bs4 import BeautifulSoup
 import xml.sax.saxutils
-from pdfminer.high_level import extract_text
 
 
 class EpubConfigurationApp(ttk.Frame):
@@ -14,7 +15,7 @@ class EpubConfigurationApp(ttk.Frame):
 
     def create_widgets(self):
         self.num_tokens = tk.StringVar(value=self.master.NUM_TOKENS)
-        self.tokens_label = ttk.Label(self, text="Number of tokens")
+        self.tokens_label = ttk.Label(self, text="Number of tokens/Number of pages for pdf")
         self.tokens_entry = ttk.Entry(self, textvariable=self.num_tokens)
         self.listbox = tk.Listbox(self, width=50)
         lines = self.get_contents()
@@ -36,11 +37,13 @@ class EpubConfigurationApp(ttk.Frame):
                 book = epub.read_epub(self.master.FILE)
                 self.items = [item for item in book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
             elif self.master.FILE.endswith(".pdf"):
-                self.items = [item.replace('\n', '') for item in extract_text(self.master.FILE).split('\n\n')]
+                pdf = pdfplumber.open(self.master.FILE)
+                self.items = range(len(pdf.pages))
+                pdf.close()
             else:
-                raise Exception("File Not Supported")
+                raise FileNotFoundError("non supported file")
         except FileNotFoundError as e:
-            self.listbox.insert(tk.END, "Enter EPub to continue")
+            self.listbox.insert(tk.END, "Enter EPub/Pdf to continue")
             self.listbox.config(height=1)
             return []
         lines = []
@@ -48,7 +51,7 @@ class EpubConfigurationApp(ttk.Frame):
             if self.master.FILE.endswith(".epub"):
                 lines.append(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}\n")
             else:
-                lines.append(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item[:40]}")
+                lines.append(f"ITEM PAGE: {pg_no},")
         return lines
 
     def back_window(self):
@@ -71,10 +74,30 @@ class EpubConfigurationApp(ttk.Frame):
                 contents.append(content)
             self.master.ssml_strings = self.create_ssml_strings(contents, int(self.num_tokens.get()))
         else:
-            self.master.ssml_strings = [([(item, "p", "none")], 1, item_no, item_no+1)for item_no, item in enumerate(self.items)]
-            self.master.current_window += 1
-            self.master.START_INDEX = 0
+            self.create_ssml_strings_for_pdf(item_page)
         self.master.show_next_window()
+
+    def create_ssml_strings_for_pdf(self, item_page):
+        num_tokens = int(self.num_tokens.get())
+        pdf = pdfplumber.open(self.master.FILE)
+        self.master.ssml_strings = []
+        for page in pdf.pages[item_page:item_page+num_tokens]:
+            lines = page.extract_text_simple(x_tolerance=1, y_tolerance=3).replace('ﬁ', 'fi').split('\n')
+            start_token = 0
+            token_number = 0
+            paragraphs = []
+            current_paragraph = ""
+            for line in lines:
+                current_paragraph += xml.sax.saxutils.escape(line)
+                if len(line) < 48:
+                    # new paragraph
+                    paragraphs.append((current_paragraph, "p", "none"))
+                    current_paragraph = ""
+                    token_number += 1
+            if current_paragraph:
+                paragraphs.append((current_paragraph, "p", "none"))
+            self.master.ssml_strings.append((paragraphs, token_number, start_token, token_number))
+        pdf.close()
 
     def create_ssml_strings(self, contents, num_tokens):
         def reset_ssml_string():

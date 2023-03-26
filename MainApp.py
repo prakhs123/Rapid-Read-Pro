@@ -29,10 +29,10 @@ class MainApp(tk.Tk):
         self.STYLE = "narration-professional"
         self.COLOR_OPTION = ColorOptions.COLOR_OPTIONS.personal_favourite
         self.FONT_OPTION = "Times New Roman"
-        self.TOP_FONT_SIZE = 24
-        self.BOTTOM_FONT_SIZE = 24
-        self.CENTER_FONT_SIZE = 36
-        self.WORD_FONT_SIZE = 60
+        self.TOP_FONT_SIZE = 12
+        self.BOTTOM_FONT_SIZE = 12
+        self.CENTER_FONT_SIZE = 18
+        self.WORD_FONT_SIZE = 30
         self.SEPERATOR_LINE_HEIGHT = 15
         self.SEPERATOR_LINE_WIDTH = 3
         self.NUM_WORDS_IN_CENTER_TEXT = 5

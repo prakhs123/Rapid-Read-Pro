@@ -137,8 +137,7 @@ class RapidReadProApp(ttk.Frame):
         self.start_button = ttk.Button(self, text="Start Reading",
                                        command=lambda: self.start_audio_and_display(self.master.START_INDEX))
         self.start_button.grid(row=2)
-        self.master.geometry("1366x768")
-        self.master.eval('tk::PlaceWindow . center')
+        self.master.attributes('-fullscreen', True)
 
     def back_window(self):
         logging.info("Back Window button pressed")

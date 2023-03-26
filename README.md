@@ -19,8 +19,9 @@ This script not only provides background TTS but also displays the text's words 
 * Azure Cognitive Services Speech SDK
 * just_playback
 * Tkinter
-* pdfminer.six
-* Other necessary Python modules (as listed in requirements.txt)
+* pdfplumber (which in turn relies on pdfminer.six)
+* EbookLib
+* beautifulsoup4
 
 ## How to use
 Clone or download the repository.
@@ -35,10 +36,10 @@ Tokens are the smallest unit, and a single SSML string can contain one or more t
 ```commandline
 # intel macs build on silicon macs
 arch -x86_64 /Library/Frameworks/Python.framework/Versions/3.9/bin/python3.9-intel64 -m venv v14
-source v14/bin/activate
+source v19/bin/activate
 arch -x86_64 pip install -r requirements.txt
 arch -x86_64 pip install pyinstaller
-arch -x86_64 pyinstaller MainApp.py --paths "v16/lib/python3.9/site-packages" --add-binary "v16/lib/python3.9/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "InputsApp.py:." --add-data "EpubConfigurationApp.py:." --add-data "IndexConfigurationApp.py:." --add-data "ReadingConfigurationApp.py:." --add-data "RapidReadProApp.py:." --add-data "ColorOptions.py:." --add-data "Words.py:." --add-data "v16/lib/python3.9/site-packages/cffi:cffi" --hidden-import=_cffi_backend --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro  -D --name rapid-read-pro --windowed --target-architecture x86_64
+arch -x86_64 pyinstaller MainApp.py --paths "v19/lib/python3.9/site-packages" --add-binary "v19/lib/python3.9/site-packages/azure/cognitiveservices/speech/libMicrosoft.CognitiveServices.Speech.core.dylib:." --add-data "InputsApp.py:." --add-data "EpubConfigurationApp.py:." --add-data "IndexConfigurationApp.py:." --add-data "ReadingConfigurationApp.py:." --add-data "RapidReadProApp.py:." --add-data "ColorOptions.py:." --add-data "Words.py:." --add-data "v19/lib/python3.9/site-packages/cffi:cffi" --hidden-import=_cffi_backend --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro --osx-bundle-identifier com.prakhs.freelancer.rapid-read-pro  -D --name rapid-read-pro --windowed --target-architecture x86_64
 
 # windows
 pyinstaller MainApp.py --paths "v18\Lib\site-packages" --add-binary "v18\Lib\site-packages\azure\cognitiveservices\speech\Microsoft.CognitiveServices.Speech.core.dll;." --add-data "v18\Lib\site-packages\cffi;cffi" --hidden-import=_cffi_backend --add-data "InputsApp.py;." --add-data "EpubConfigurationApp.py;." --add-data "IndexConfigurationApp.py;." --add-data "ReadingConfigurationApp.py;." --add-data "RapidReadProApp.py;." --add-data "ColorOptions.py;." --add-data "Words.py;." -D --name rapid-read-pro --windowed

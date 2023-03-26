@@ -1,6 +1,8 @@
 import os.path
 import tkinter as tk
 from tkinter import ttk, filedialog
+import azure.cognitiveservices.speech as speechsdk
+from azure.cognitiveservices.speech import ResultReason
 
 
 class InputsApp(ttk.Frame):
@@ -31,8 +33,21 @@ class InputsApp(ttk.Frame):
     def next_window(self):
         self.master.SPEECH_KEY = self.speech_key.get()
         self.master.SPEECH_REGION = self.speech_region.get()
+        working = self.check_speech_key()
+        if not working:
+            self.next_button.config(text="Invalid Speech Key, Correct the key and press here again")
+            return
         self.master.FILE = self.filepath.get()
         self.master.show_next_window()
+
+    def check_speech_key(self):
+        speech_config = speechsdk.SpeechConfig(subscription=self.master.SPEECH_KEY, region=self.master.SPEECH_REGION)
+        speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
+        r = speech_synthesizer.get_voices_async().get()
+        if r.reason != ResultReason.VoicesListRetrieved:
+            return False
+        else:
+            return True
 
     def open_file(self):
         file_path = filedialog.askopenfilename(title="Add Epub/PDF File",
