@@ -77,10 +77,10 @@ class RapidReadProApp(ttk.Frame):
         self.curr_index = 0
         self.first_run = True
         self.playback = None
+        self.line1 = self.line2 = self.line3 = self.line4 = None
 
     def create_widgets(self):
         self.ssml_strings = self.create_ssml_strings()
-        self.master.attributes('-fullscreen', True)
         self.top_frame = ttk.Frame(self)
         self.top_text = tk.Text(self.top_frame, font=(self.master.FONT_OPTION, self.master.TOP_FONT_SIZE),
                                 bg=self.master.COLOR_OPTION.bg, fg=self.master.COLOR_OPTION.text, width=1, height=1,
@@ -137,6 +137,8 @@ class RapidReadProApp(ttk.Frame):
         self.start_button = ttk.Button(self, text="Start Reading",
                                        command=lambda: self.start_audio_and_display(self.master.START_INDEX))
         self.start_button.grid(row=2)
+        self.master.geometry("1366x768")
+        self.master.eval('tk::PlaceWindow . center')
 
     def back_window(self):
         logging.info("Back Window button pressed")
@@ -311,17 +313,25 @@ class RapidReadProApp(ttk.Frame):
         self.bottom_text.delete("1.0", tk.END)
         if forward_words:
             self.bottom_text.insert("end", forward_words)
-        self.top_line.create_line(0, self.top_line.winfo_height() // 2, self.top_line.winfo_width(),
+        if self.line1:
+            self.top_line.delete(self.line1)
+        if self.line2:
+            self.top_line.delete(self.line2)
+        if self.line3:
+            self.bottom_line.delete(self.line3)
+        if self.line4:
+            self.bottom_line.delete(self.line4)
+        self.line1 = self.top_line.create_line(0, self.top_line.winfo_height() // 2, self.top_line.winfo_width(),
                                   self.top_line.winfo_height() // 2, width=self.master.SEPERATOR_LINE_WIDTH,
                                   fill=self.master.COLOR_OPTION.text)
-        self.top_line.create_line(self.center_frame.winfo_width() // 2, self.top_line.winfo_height() // 2,
+        self.line2 = self.top_line.create_line(self.center_frame.winfo_width() // 2, self.top_line.winfo_height() // 2,
                                   self.center_frame.winfo_width() // 2, self.top_line.winfo_height(),
                                   width=self.master.SEPERATOR_LINE_WIDTH, fill=self.master.COLOR_OPTION.text)
-        self.bottom_line.create_line(0, self.bottom_line.winfo_height() // 2,
+        self.line3 = self.bottom_line.create_line(0, self.bottom_line.winfo_height() // 2,
                                      self.bottom_line.winfo_width(), self.bottom_line.winfo_height() // 2,
                                      width=self.master.SEPERATOR_LINE_WIDTH,
                                      fill=self.master.COLOR_OPTION.text)
-        self.bottom_line.create_line(self.center_frame.winfo_width() // 2, self.bottom_line.winfo_height() // 2,
+        self.line4 = self.bottom_line.create_line(self.center_frame.winfo_width() // 2, self.bottom_line.winfo_height() // 2,
                                      self.center_frame.winfo_width() // 2, 0,
                                      width=self.master.SEPERATOR_LINE_WIDTH,
                                      fill=self.master.COLOR_OPTION.text)
