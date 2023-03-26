@@ -19,6 +19,7 @@ This script not only provides background TTS but also displays the text's words 
 * Azure Cognitive Services Speech SDK
 * just_playback
 * Tkinter
+* pdfminer.six
 * Other necessary Python modules (as listed in requirements.txt)
 
 ## How to use
