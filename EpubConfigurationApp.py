@@ -4,6 +4,7 @@ from ebooklib import epub
 import ebooklib
 from bs4 import BeautifulSoup
 import xml.sax.saxutils
+from pdfminer.high_level import extract_text
 
 
 class EpubConfigurationApp(ttk.Frame):
@@ -31,15 +32,23 @@ class EpubConfigurationApp(ttk.Frame):
 
     def get_contents(self):
         try:
-            book = epub.read_epub(self.master.EPUB_FILE)
-            self.items = [item for item in book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
+            if self.master.FILE.endswith(".epub"):
+                book = epub.read_epub(self.master.FILE)
+                self.items = [item for item in book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
+            elif self.master.FILE.endswith(".pdf"):
+                self.items = [item.replace('\n', '') for item in extract_text(self.master.FILE).split('\n\n')]
+            else:
+                raise Exception("File Not Supported")
         except FileNotFoundError as e:
             self.listbox.insert(tk.END, "Enter EPub to continue")
             self.listbox.config(height=1)
             return []
         lines = []
         for pg_no, item in enumerate(self.items):
-            lines.append(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}\n")
+            if self.master.FILE.endswith(".epub"):
+                lines.append(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item.file_name}\n")
+            else:
+                lines.append(f"ITEM PAGE: {pg_no}, ITEM CONTENTS: {item[:40]}")
         return lines
 
     def back_window(self):
@@ -48,18 +57,23 @@ class EpubConfigurationApp(ttk.Frame):
     def next_window(self, event):
         selected_item = self.listbox.get(self.listbox.curselection())
         item_page = int(selected_item[len("ITEM PAGE: ") - 1: selected_item.index(',')])
-        item = self.items[item_page]
-        html = item.get_content()
-        soup = BeautifulSoup(html, 'html.parser')
-        for s in soup.find_all(['tr', 'th', 'td']):
-            s.extract()
-        cc = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li'])
-        contents = []
-        for content in cc:
-            if content.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li']):
-                continue
-            contents.append(content)
-        self.master.ssml_strings = self.create_ssml_strings(contents, int(self.num_tokens.get()))
+        if self.master.FILE.endswith(".epub"):
+            item = self.items[item_page]
+            html = item.get_content()
+            soup = BeautifulSoup(html, 'html.parser')
+            for s in soup.find_all(['tr', 'th', 'td']):
+                s.extract()
+            cc = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li'])
+            contents = []
+            for content in cc:
+                if content.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'dt', 'dd', 'li']):
+                    continue
+                contents.append(content)
+            self.master.ssml_strings = self.create_ssml_strings(contents, int(self.num_tokens.get()))
+        else:
+            self.master.ssml_strings = [([(item, "p", "none")], 1, item_no, item_no+1)for item_no, item in enumerate(self.items)]
+            self.master.current_window += 1
+            self.master.START_INDEX = 0
         self.master.show_next_window()
 
     def create_ssml_strings(self, contents, num_tokens):

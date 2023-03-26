@@ -21,14 +21,14 @@ class MainApp(tk.Tk):
         self.columnconfigure(0, weight=1)
         self.SPEECH_KEY = os.environ.get('SPEECH_KEY', "")
         self.SPEECH_REGION = os.environ.get('SPEECH_REGION', "")
-        self.EPUB_FILE = ""
+        self.FILE = ""
         self.NUM_TOKENS = "50"
         self.START_INDEX = 0
         self.SPEED = "1.20"
         self.VOICE = "en-US-AriaNeural"
         self.STYLE = "narration-professional"
         self.COLOR_OPTION = ColorOptions.COLOR_OPTIONS.personal_favourite
-        self.FONT_OPTION = "Verdana"
+        self.FONT_OPTION = "Times New Roman"
         self.TOP_FONT_SIZE = 24
         self.BOTTOM_FONT_SIZE = 24
         self.CENTER_FONT_SIZE = 36
