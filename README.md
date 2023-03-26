@@ -3,7 +3,7 @@
 This is a Python-based GUI application that converts text to speech, with the ability to play audio, pause, resume, skip, and go back to any part of the audio. It can also display the text word-by-word using the Rapid Serial Visual Presentation (RSVP) technique.
 
 ## The Script 
-This script enables the conversion of EPUB/HTML files or web pages with articles/sections into speech using Azure's Text-to-Speech (TTS) service. The input is first converted into HTML and then transformed into speech using Microsoft Azure Cognitive Services. To run this script, it is necessary to set the SPEECH_KEY and SPEECH_REGION environment variables with a valid Azure subscription key and region, respectively.
+This script enables the conversion of EPUB/PDF files into speech using Azure's Text-to-Speech (TTS) service. The input is first converted into HTML and then transformed into speech using Microsoft Azure Cognitive Services. To run this script, it is necessary to set the SPEECH_KEY and SPEECH_REGION environment variables with a valid Azure subscription key and region, respectively.
 
 Once the input is converted into HTML, the HTML content is divided into multiple ssml strings (XML), which are referred to as "Index." Each ssml string contains headings or paragraphs, which are further divided into smaller units called "tokens." The HTML page can be split into ssml strings either by headings or by a specified number of tokens (default 50).
 
