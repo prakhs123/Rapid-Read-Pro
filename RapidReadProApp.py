@@ -76,6 +76,7 @@ class RapidReadProApp(ttk.Frame):
         self.display_queue = None
         self.curr_index = 0
         self.first_run = True
+        self.playback = None
 
     def create_widgets(self):
         self.ssml_strings = self.create_ssml_strings()
@@ -139,12 +140,12 @@ class RapidReadProApp(ttk.Frame):
 
     def back_window(self):
         logging.info("Back Window button pressed")
-        display_id_under_queue, word_index = self.display_queue
-        # stop playing
-        self.playback.stop()
-        # Cancel next display
-        if display_id_under_queue:
-            self.master.after_cancel(display_id_under_queue)
+        if self.display_queue:
+            display_id_under_queue, word_index = self.display_queue
+            if display_id_under_queue:
+                self.master.after_cancel(display_id_under_queue)
+        if self.playback:
+            self.playback.stop()
         self.master.show_back_window()
 
     def play_pause(self):
@@ -262,76 +263,76 @@ class RapidReadProApp(ttk.Frame):
         return playback
 
     def display_word(self, word_index):
-        if word_index >= len(self.words):
-            self.playback.stop()
+        if word_index == len(self.words):
+            if self.playback.playing:
+                self.playback.stop()
             self.start_audio_and_display(self.curr_index + 1)
             return
-        if self.playback and self.playback.playing:
-            word, word_offset, word_time, left_words, right_words, previous_words, forward_words = self.words[
-                word_index]
-            self.center_text.config(state=tk.NORMAL)
-            self.center_text.delete("1.0", tk.END)
-            if self.first_run:
-                center_font = tkFont.Font(family=self.master.FONT_OPTION, size=self.master.CENTER_FONT_SIZE)
-                center_font_height = center_font.metrics('linespace')
-                total_height = self.center_frame.winfo_height()
-                left_over_space = total_height - center_font_height
-                spacing1 = 0
-                if left_over_space > 0:
-                    spacing1 = left_over_space // 2
-                self.center_text.config(spacing1=spacing1)
-                self.first_run = False
-            highlight_index_word = switch(len(word))
-            left_words += ' '
-            right_words = ' ' + right_words
-            self.center_text.tag_add("left_words", "1.0", f"1.{len(left_words) - 1}")
-            self.center_text.tag_config("left_words")
-            self.center_text.insert(tk.END, left_words, "left_words")
-            self.center_text.tag_add("center_word", f"1.{len(left_words)}", f"1.{len(left_words) + len(word) - 1}")
-            self.center_text.tag_config("center_word", font=(self.master.FONT_OPTION, self.master.WORD_FONT_SIZE))
-            self.center_text.insert(tk.END, word, "center_word")
-            self.center_text.tag_add("right_words", f"1.{len(left_words) + len(word)}",
-                                     f"1.{len(left_words + word + right_words)}")
-            self.center_text.tag_config("right_words")
-            self.center_text.insert(tk.END, right_words, "right_words")
-            center_width = self.center_frame.winfo_width() // 2
-            if self.center_text.bbox(f'1.{len(left_words) + highlight_index_word - 1}'):
-                x_pos = self.center_text.bbox(f'1.{len(left_words) + highlight_index_word - 1}')[0]
-            else:
-                x_pos = 0
-            self.center_text.tag_add('lmargin1', "1.0", "1.end")
-            self.center_text.tag_config('lmargin1', lmargin1=center_width - x_pos)
-            self.center_text.tag_add("highlight", f"1.{len(left_words) + highlight_index_word - 1}")
-            self.center_text.tag_config("highlight", foreground=self.master.COLOR_OPTION.highlight)
-            self.center_text.config(state=tk.DISABLED)
-            self.top_text.delete("1.0", tk.END)
-            if previous_words:
-                self.top_text.insert(f"end", previous_words)
-            self.bottom_text.delete("1.0", tk.END)
-            if forward_words:
-                self.bottom_text.insert("end", forward_words)
-            self.top_line.create_line(0, self.top_line.winfo_height() // 2, self.top_line.winfo_width(),
-                                      self.top_line.winfo_height() // 2, width=self.master.SEPERATOR_LINE_WIDTH,
-                                      fill=self.master.COLOR_OPTION.text)
-            self.top_line.create_line(self.center_frame.winfo_width() // 2, self.top_line.winfo_height() // 2,
-                                      self.center_frame.winfo_width() // 2, self.top_line.winfo_height(),
-                                      width=self.master.SEPERATOR_LINE_WIDTH, fill=self.master.COLOR_OPTION.text)
-            self.bottom_line.create_line(0, self.bottom_line.winfo_height() // 2,
-                                         self.bottom_line.winfo_width(), self.bottom_line.winfo_height() // 2,
-                                         width=self.master.SEPERATOR_LINE_WIDTH,
-                                         fill=self.master.COLOR_OPTION.text)
-            self.bottom_line.create_line(self.center_frame.winfo_width() // 2, self.bottom_line.winfo_height() // 2,
-                                         self.center_frame.winfo_width() // 2, 0,
-                                         width=self.master.SEPERATOR_LINE_WIDTH,
-                                         fill=self.master.COLOR_OPTION.text)
-            if round(self.playback.curr_pos * 1000) - (word_offset + word_time) > 700 and word_time > 500:
-                # reduce word time of next occurrence
-                logging.info("Reducing word time of this occurrence")
-                next_display_id = self.master.after(word_time - 200, self.display_word, word_index + 1)
-                self.display_queue = (next_display_id, word_index + 1,)
-            else:
-                next_display_id = self.master.after(word_time, self.display_word, word_index + 1)
-                self.display_queue = (next_display_id, word_index + 1,)
+        word, word_offset, word_time, left_words, right_words, previous_words, forward_words = self.words[
+            word_index]
+        self.center_text.config(state=tk.NORMAL)
+        self.center_text.delete("1.0", tk.END)
+        if self.first_run:
+            center_font = tkFont.Font(family=self.master.FONT_OPTION, size=self.master.CENTER_FONT_SIZE)
+            center_font_height = center_font.metrics('linespace')
+            total_height = self.center_frame.winfo_height()
+            left_over_space = total_height - center_font_height
+            spacing1 = 0
+            if left_over_space > 0:
+                spacing1 = left_over_space // 2
+            self.center_text.config(spacing1=spacing1)
+            self.first_run = False
+        highlight_index_word = switch(len(word))
+        left_words += ' '
+        right_words = ' ' + right_words
+        self.center_text.tag_add("left_words", "1.0", f"1.{len(left_words) - 1}")
+        self.center_text.tag_config("left_words")
+        self.center_text.insert(tk.END, left_words, "left_words")
+        self.center_text.tag_add("center_word", f"1.{len(left_words)}", f"1.{len(left_words) + len(word) - 1}")
+        self.center_text.tag_config("center_word", font=(self.master.FONT_OPTION, self.master.WORD_FONT_SIZE))
+        self.center_text.insert(tk.END, word, "center_word")
+        self.center_text.tag_add("right_words", f"1.{len(left_words) + len(word)}",
+                                 f"1.{len(left_words + word + right_words)}")
+        self.center_text.tag_config("right_words")
+        self.center_text.insert(tk.END, right_words, "right_words")
+        center_width = self.center_frame.winfo_width() // 2
+        if self.center_text.bbox(f'1.{len(left_words) + highlight_index_word - 1}'):
+            x_pos = self.center_text.bbox(f'1.{len(left_words) + highlight_index_word - 1}')[0]
+        else:
+            x_pos = 0
+        self.center_text.tag_add('lmargin1', "1.0", "1.end")
+        self.center_text.tag_config('lmargin1', lmargin1=center_width - x_pos)
+        self.center_text.tag_add("highlight", f"1.{len(left_words) + highlight_index_word - 1}")
+        self.center_text.tag_config("highlight", foreground=self.master.COLOR_OPTION.highlight)
+        self.center_text.config(state=tk.DISABLED)
+        self.top_text.delete("1.0", tk.END)
+        if previous_words:
+            self.top_text.insert(f"end", previous_words)
+        self.bottom_text.delete("1.0", tk.END)
+        if forward_words:
+            self.bottom_text.insert("end", forward_words)
+        self.top_line.create_line(0, self.top_line.winfo_height() // 2, self.top_line.winfo_width(),
+                                  self.top_line.winfo_height() // 2, width=self.master.SEPERATOR_LINE_WIDTH,
+                                  fill=self.master.COLOR_OPTION.text)
+        self.top_line.create_line(self.center_frame.winfo_width() // 2, self.top_line.winfo_height() // 2,
+                                  self.center_frame.winfo_width() // 2, self.top_line.winfo_height(),
+                                  width=self.master.SEPERATOR_LINE_WIDTH, fill=self.master.COLOR_OPTION.text)
+        self.bottom_line.create_line(0, self.bottom_line.winfo_height() // 2,
+                                     self.bottom_line.winfo_width(), self.bottom_line.winfo_height() // 2,
+                                     width=self.master.SEPERATOR_LINE_WIDTH,
+                                     fill=self.master.COLOR_OPTION.text)
+        self.bottom_line.create_line(self.center_frame.winfo_width() // 2, self.bottom_line.winfo_height() // 2,
+                                     self.center_frame.winfo_width() // 2, 0,
+                                     width=self.master.SEPERATOR_LINE_WIDTH,
+                                     fill=self.master.COLOR_OPTION.text)
+        if round(self.playback.curr_pos * 1000) - (word_offset + word_time) > 100 and word_time > 100:
+            # reduce word time of next occurrence
+            logging.info("Reducing word time of this occurrence")
+            next_display_id = self.master.after(word_time - 100, self.display_word, word_index + 1)
+            self.display_queue = (next_display_id, word_index + 1,)
+        else:
+            next_display_id = self.master.after(word_time, self.display_word, word_index + 1)
+            self.display_queue = (next_display_id, word_index + 1,)
 
     def start_audio_and_display(self, index):
         if index >= (len(self.ssml_strings)):

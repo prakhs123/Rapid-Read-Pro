@@ -2,7 +2,5 @@ wheel
 EbookLib
 beautifulsoup4
 azure-cognitiveservices-speech
-requests-html
 just_playback
-pypdf2
 # tkinter

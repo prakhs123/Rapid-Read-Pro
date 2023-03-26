@@ -53,7 +53,11 @@ class MainApp(tk.Tk):
     def create_window(self):
         self.window = self.window_classes[self.current_window](self)
         self.window.create_widgets()
-        self.window.pack(fill=tk.BOTH, expand=1)
+        if isinstance(self.window, RapidReadProApp):
+            self.window.pack(fill=tk.BOTH, expand=1)
+        else:
+            self.window.pack()
+            self.geometry('{}x{}'.format(self.window.winfo_reqwidth(), self.window.winfo_reqheight()))
 
     def destroy_window(self):
         self.window.pack_forget()
