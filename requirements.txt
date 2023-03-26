@@ -3,5 +3,5 @@ EbookLib
 beautifulsoup4
 azure-cognitiveservices-speech
 just_playback
-pdfminer.six
+pdfplumber
 # tkinter
